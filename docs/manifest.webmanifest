@@ -1,0 +1,25 @@
+{
+ "name": "eitLab FrontPanel",
+ "short_name": "FrontPanel",
+ "description": "Konfigurator frontów rozdzielnic – opisy, DXF do lasera, PDF",
+ "start_url": "./index.html",
+ "scope": "./",
+ "display": "standalone",
+ "orientation": "any",
+ "background_color": "#e9ebea",
+ "theme_color": "#1f2427",
+ "lang": "pl",
+ "icons": [
+  {
+   "src": "icons/icon-192.png",
+   "sizes": "192x192",
+   "type": "image/png"
+  },
+  {
+   "src": "icons/icon-512.png",
+   "sizes": "512x512",
+   "type": "image/png",
+   "purpose": "any maskable"
+  }
+ ]
+}

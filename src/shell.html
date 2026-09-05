@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f2427">
+<title>eitLab FrontPanel – konfigurator frontów rozdzielnic</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%231f2427'/%3E%3Crect x='12' y='14' width='40' height='14' rx='2' fill='%23f2b705'/%3E%3Crect x='12' y='34' width='40' height='16' fill='none' stroke='%23e6e8e7' stroke-width='3'/%3E%3C/svg%3E">
+<style>
+:root{
+  --panel:#e9ebea; --panel-2:#f4f5f4; --card:#ffffff; --ink:#1f2427; --ink-2:#5a6166; --line:#c9cfce; --white:#fff;
+  --signal:#f2b705; --danger:#c62828; --ok:#2e7d32; --sel:#1f6fd1;
+  --cab:#d7dad8; --cab-edge:#3b4044; --cab-inner:#c3c7c5; --plinth:#9ea3a6; --empty:#b9bdbb; --plate:#d8cfae; --cover:#eeefed; --cover-edge:#767c80; --niche:#b8bcba; --dev:#f7f7f5; --dev-edge:#5c6266; --lab:#fff; --door:#e4e6e4;
+  --font-head:"Bahnschrift","DIN Alternate","Roboto Condensed","Arial Narrow",system-ui,sans-serif;
+  --font-body:system-ui,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --tap:40px;
+}
+:root[data-theme="dark"]{ --panel:#1f2226; --panel-2:#24282c; --card:#2c3034; --ink:#ecedee; --ink-2:#aeb4b9; --line:#4a5055; --white:#2c3034; --cab:#3a3e42; --cab-inner:#33373a; --cover:#464b4f; --niche:#2c3033; --dev:#4a4f54; --dev-edge:#9aa0a5; --lab:#e8e9ea; --cover-edge:#9aa0a5; --cab-edge:#b0b5b9; --empty:#2f3336; --door:#40454a }
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--panel);color:var(--ink);font:14px/1.45 var(--font-body);height:100%;overscroll-behavior:none}
+button,input,select,textarea{font:inherit;color:inherit}
+h1{font:600 18px/1.1 var(--font-head);margin:0;letter-spacing:.01em}
+h2{font:600 15px/1.2 var(--font-head);margin:0 0 8px}
+h3{font:600 12px/1.2 var(--font-head);margin:14px 0 6px;color:var(--ink-2);text-transform:uppercase;letter-spacing:.06em}
+header{display:flex;align-items:center;gap:10px;padding:6px 12px;border-bottom:2px solid var(--ink);background:var(--panel);min-height:50px}
+header .logo{display:flex;align-items:center;gap:8px}
+header .logo svg{width:28px;height:28px}
+header .crumb{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2);flex-wrap:wrap}
+header .crumb b{color:var(--ink)}
+header .spacer{flex:1}
+button{cursor:pointer;border:1.5px solid var(--ink);background:var(--card);padding:8px 12px;border-radius:4px;font-weight:600;line-height:1.2;min-height:var(--tap)}
+button:hover{filter:brightness(.96)}
+button.primary{background:var(--signal);color:#1f2427;border-color:#1f2427}
+button.small{padding:5px 9px;font-size:12px;font-weight:500;min-height:32px}
+button.icon{padding:5px 8px;min-width:32px;min-height:32px}
+button.ghost{border-color:var(--line);font-weight:500}
+button.danger{color:var(--danger);border-color:var(--danger)}
+button:disabled{opacity:.45;cursor:default}
+button:focus-visible,input:focus,select:focus,textarea:focus{outline:2px solid var(--signal);outline-offset:1px}
+main{display:grid;grid-template-columns:1fr 400px;height:calc(100vh - 52px)}
+.stage{position:relative;overflow:hidden;padding:10px 12px;background:var(--panel);display:flex;flex-direction:column;min-height:0}
+.stage svg{display:block;width:auto;max-width:100%;max-height:100%;margin:0 auto;touch-action:none;user-select:none;flex:1;min-height:0}
+#canvas{flex:1;min-height:0;display:flex}
+.stagebar{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.seg{display:inline-flex;border:1.5px solid var(--ink);border-radius:4px;overflow:hidden;background:var(--card)}
+.seg button{border:0;border-radius:0;font-weight:500;padding:6px 12px;font-size:13px;min-height:36px;background:transparent}
+.seg button+button{border-left:1.5px solid var(--ink)}
+.seg button.on{background:var(--ink);color:var(--panel)}
+.side{border-left:2px solid var(--ink);background:var(--panel-2);display:flex;flex-direction:column;min-height:0}
+.tabs{display:flex;border-bottom:1.5px solid var(--ink);background:var(--panel)}
+.tabs button{flex:1;border:0;border-radius:0;background:transparent;padding:10px 4px;font-weight:500;font-size:13px;min-height:44px}
+.tabs button.on{background:var(--ink);color:var(--panel)}
+.tab{display:none;padding:12px 14px 20px;overflow:auto;flex:1}
+.tab.on{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:10px 12px;margin-bottom:10px}
+.card h2{margin-bottom:6px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px 10px;margin-bottom:8px}
+.row.three{grid-template-columns:1fr 1fr 1fr}
+.row.four{grid-template-columns:1fr 1fr 1fr 1fr}
+label.f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink-2)}
+label.f input,label.f select,label.f textarea{padding:7px 8px;border:1px solid var(--line);border-radius:4px;background:var(--white);color:var(--ink);width:100%;min-width:0;min-height:36px}
+label.f textarea{min-height:60px;resize:vertical}
+label.chk{display:flex;align-items:center;gap:8px;font-size:13px;margin:6px 0;min-height:28px}
+label.chk input{width:18px;height:18px}
+.hint{font-size:12px;color:var(--ink-2);margin:4px 0 8px}
+.hint code{background:var(--white);padding:0 4px;border:1px solid var(--line);border-radius:3px}
+.btns{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.list{border:1px solid var(--line);background:var(--white);border-radius:4px;overflow:hidden}
+.list .it{display:flex;align-items:center;gap:6px;padding:7px 8px;border-bottom:1px solid var(--line);font-size:13px;cursor:pointer;min-height:40px}
+.list .it:last-child{border-bottom:0}
+.list .it.on{background:color-mix(in srgb,var(--sel) 14%,var(--white))}
+.list .it .grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.list .it .tag{font-size:11px;padding:1px 6px;border-radius:3px;background:var(--panel);color:var(--ink-2)}
+.pal{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:6px}
+.pal button{display:flex;flex-direction:column;align-items:flex-start;gap:2px;padding:6px 8px;border-color:var(--line);text-align:left;font-weight:500;min-height:52px}
+.pal button b{font:600 14px var(--font-head)}
+.pal button span{font-size:11px;color:var(--ink-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.pal button i{font-style:normal;font-size:11px;color:var(--ink-2)}
+table.db{width:100%;border-collapse:collapse;font-size:12px}
+table.db th{text-align:left;font-weight:500;color:var(--ink-2);padding:3px 4px;position:sticky;top:0;background:var(--card)}
+table.db td{padding:2px 3px}
+table.db input,table.db select{width:100%;padding:6px;border:1px solid var(--line);border-radius:4px;background:var(--white);color:var(--ink);font-size:12px;min-height:34px}
+table.db td.n{width:64px}
+.editor{position:sticky;bottom:0;background:var(--panel);border-top:2px solid var(--ink);padding:10px 14px;display:none;max-height:46vh;overflow:auto}
+.editor.on{display:block}
+.editor .row{margin-bottom:6px}
+.toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:var(--ink);color:var(--panel);padding:10px 16px;border-radius:4px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;z-index:99}
+.toast.on{opacity:1}
+.msg{font-size:12px;margin:6px 0;padding:8px 10px;border-left:3px solid var(--signal);background:var(--white);border-radius:0 4px 4px 0}
+.msg.err{border-color:var(--danger)} .msg.ok{border-color:var(--ok)}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:12px}
+.modal.on{display:flex}
+.modal .box{background:var(--panel-2);border:2px solid var(--ink);border-radius:8px;width:min(960px,100%);max-height:94vh;display:flex;flex-direction:column;overflow:hidden}
+.modal .box>header{border-bottom:1.5px solid var(--ink);padding:8px 14px}
+.modal .body{padding:12px 14px;overflow:auto}
+.modal .body.two{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+svg text{font-family:var(--font-body)}
+.dev{cursor:grab}
+.dev.sel rect.body{stroke:var(--sel);stroke-width:1.4}
+.ghost{fill:none;stroke:var(--sel);stroke-width:.8;stroke-dasharray:2 1;vector-effect:non-scaling-stroke}
+.overflow rect.body{stroke:var(--danger)!important}
+.item{cursor:pointer}
+.item.sel>rect.box{stroke:var(--sel)!important;stroke-width:2!important}
+.grp{cursor:grab} .grp.sel rect{opacity:1}
+.issues .it{cursor:default}
+.kbd{font:11px ui-monospace,monospace;border:1px solid var(--line);border-radius:3px;padding:0 4px;background:var(--white)}
+.drawer-btn{display:none}
+@media (max-width:1100px){
+  main{grid-template-columns:1fr 360px}
+}
+@media (max-width:900px){
+  main{grid-template-columns:1fr;grid-template-rows:1fr auto;height:calc(100vh - 52px)}
+  .stage{min-height:38vh}
+  .side{border-left:0;border-top:2px solid var(--ink);max-height:58vh}
+  .side.collapsed{max-height:44px}
+  .side.collapsed .tab{display:none}
+  .drawer-btn{display:inline-flex}
+  header .crumb{display:none}
+  .modal .body.two{grid-template-columns:1fr}
+}
+@media (pointer:coarse){ button{min-height:44px} button.small{min-height:38px} .list .it{min-height:44px} }
+@media print{ header,.side,.stagebar{display:none} }
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"><svg viewBox="0 0 64 64"><rect width="64" height="64" rx="8" fill="#1f2427"/><rect x="12" y="14" width="40" height="14" rx="2" fill="#f2b705"/><rect x="12" y="34" width="40" height="16" fill="none" stroke="#e6e8e7" stroke-width="3"/></svg><div><h1>eitLab FrontPanel</h1><div style="font-size:11px;color:var(--ink-2);line-height:1">konfigurator frontów rozdzielnic</div></div></div>
+  <div class="crumb" id="crumb"></div>
+  <div class="spacer"></div>
+  <button class="small" id="btnOrders">Zlecenia</button>
+  <button class="small" id="btnLib">Biblioteka</button>
+  <button class="small ghost icon" id="btnUndo" title="Cofnij (Ctrl+Z)">↶</button>
+  <button class="small ghost icon" id="btnRedo" title="Ponów (Ctrl+Y)">↷</button>
+  <button class="small" id="btnCheck">Sprawdź</button>
+  <button class="small ghost icon" id="btnSettings" title="Ustawienia">⚙</button>
+  <span id="syncDot" title="Stan zapisu" style="width:10px;height:10px;border-radius:50%;background:var(--ok);display:inline-block"></span>
+</header>
+<main>
+  <div class="stage" id="stage">
+    <div class="stagebar">
+      <div class="seg" id="view"><button class="on" data-v="all">Rozdzielnica</button><button data-v="cab">Szafa</button><button data-v="item">Maskownica</button></div>
+      <div class="seg" id="mode"><button class="on" data-m="design">Projekt</button><button data-m="install">Montaż</button><button data-m="door">Drzwi</button></div>
+      <div class="seg"><button id="zoomOut" title="Oddal">−</button><button id="zoomIn" title="Przybliż">+</button><button id="zoomReset" title="Dopasuj">⤢</button></div>
+      <span id="stats" style="font-size:12px;color:var(--ink-2);margin-left:auto"></span>
+    </div>
+    <div id="canvas"></div>
+  </div>
+  <div class="side" id="side">
+    <div class="tabs">
+      <button class="on" data-t="board">Rozdzielnica</button><button data-t="dev">Aparaty</button><button data-t="lab">Opisy</button><button data-t="file">Eksport</button><button class="drawer-btn icon" id="btnDrawer">▾</button>
+    </div>
+
+    <div class="tab on" id="tab-board">
+      <div class="card"><h2>Rozdzielnica</h2>
+        <div class="row three"><label class="f">Nazwa<input id="bname"></label><label class="f">Oznaczenie<input id="btag" placeholder="RG, T1…"></label><label class="f">Rewizja<input id="brev" placeholder="A"></label></div>
+        <div class="row"><label class="f">Podziałka modułu mm<input type="number" id="pitch" step="0.5"></label><label class="f">Odstęp między szafami mm<input type="number" id="cabGap" step="1"></label></div>
+      </div>
+      <div class="card"><h2>Szafy (słupki)</h2>
+        <div class="list" id="cabs"></div>
+        <div class="btns"><button class="small" id="btnAddCab">+ Szafa</button><button class="small" id="btnAddCabLib">+ Szafa z biblioteki obudów</button></div>
+        <div id="cabEdit"></div>
+      </div>
+      <div class="card"><h2>Elementy szafy – od góry</h2>
+        <div class="list" id="items"></div>
+        <div class="btns">
+          <button class="small" data-add="cover">+ Maskownica z wycięciem</button>
+          <button class="small" data-add="blank">+ Zaślepka</button>
+          <button class="small" data-add="plate">+ Płyta montażowa</button>
+          <button class="small" data-add="empty">+ Puste pole</button>
+          <button class="small ghost" id="btnCopyItem" title="Ctrl+C">Kopiuj</button><button class="small ghost" id="btnPasteItem" title="Ctrl+V">Wklej</button>
+        </div>
+        <div id="itemEdit"></div>
+      </div>
+      <div class="card"><h2>Grupy aparatów w maskownicy</h2>
+        <div class="list" id="groups"></div>
+        <div class="btns"><button class="small" data-addgrp="left">+ Do lewej</button><button class="small" data-addgrp="right">+ Do prawej</button><button class="small" data-addgrp="free">+ Swobodna</button></div>
+        <div id="grpEdit"></div>
+        <p class="hint">Grupy „do lewej” układają się od lewej krawędzi, „do prawej” od prawej. Swobodną przeciągasz za pasek nad ramkami – przy krawędzi sama się dosuwa.</p>
+      </div>
+    </div>
+
+    <div class="tab" id="tab-dev">
+      <div class="card"><h2>Dodaj aparat</h2><div id="devTarget" class="hint"></div><div class="pal" id="pal"></div>
+        <p class="hint">Bazę aparatów (kody, moduły, tabelki, modele) edytujesz w <b>Bibliotece</b> (przycisk w nagłówku).</p></div>
+      <div class="card"><h2>Zaznaczone aparaty</h2><div id="multi" class="hint">Kliknij aparat na rysunku. Shift+klik zaznacza kilka.</div></div>
+    </div>
+
+    <div class="tab" id="tab-lab">
+      <div class="card"><h2>Ramki opisów</h2>
+        <div class="row three"><label class="f">Wys. ramki mm<input type="number" id="labH" step="0.5"></label><label class="f">Odstęp od wycięcia mm<input type="number" id="labGap" step="0.5"></label><label class="f">Margines tekstu mm<input type="number" id="labPad" step="0.1"></label></div>
+        <div class="row three"><label class="f">Zaokrąglenie mm<input type="number" id="frameR" step="0.5" min="0"></label><label class="f">Podział % (górna komórka)<input type="number" id="split" step="5" min="20" max="80"></label><label class="f">Dokładność łuków<select id="segs"><option value="4">Niska</option><option value="8" selected>Średnia</option><option value="16">Wysoka</option></select></label></div>
+        <h3>Grubości linii (mm, 0 = pojedyncza kreska)</h3>
+        <div class="row three"><label class="f">Obrys ramki<input type="number" id="lwMain" step="0.05" min="0"></label><label class="f">Podział pionowy<input type="number" id="lwDivV" step="0.05" min="0"></label><label class="f">Podział poziomy<input type="number" id="lwDivH" step="0.05" min="0"></label></div>
+        <label class="chk"><input type="checkbox" id="frameOn"> Obrys ramki (FRAME_MAIN)</label>
+        <label class="chk"><input type="checkbox" id="divVOn"> Pionowe linie podziału (FRAME_DIV_V)</label>
+        <label class="chk"><input type="checkbox" id="divHOn"> Poziome linie podziału (FRAME_DIV_H)</label>
+        <label class="chk"><input type="checkbox" id="symTop"> Symbol w górnej komórce, nazwa w dolnej</label>
+        <label class="chk"><input type="checkbox" id="showRating"> Model aparatu (np. C32) w ramce pod nazwą</label>
+      </div>
+      <div class="card"><h2>Symbol</h2><div class="row"><label class="f">Wysokość tekstu mm<input type="number" id="symH" step="0.5"></label><label class="f">Czcionka<select id="fontSym"></select></label></div><div id="fontSymSample" style="color:var(--ink)"></div></div>
+      <div class="card"><h2>Nazwa / opis</h2><div class="row three"><label class="f">Wys. nazwy mm<input type="number" id="nameH" step="0.5"></label><label class="f">Wys. w polach tabelki mm<input type="number" id="cellH" step="0.5"></label><label class="f">Czcionka<select id="font"></select></label></div><div id="fontSample" style="color:var(--ink)"></div>
+        <div class="row" style="margin-top:8px"><label class="f">Skala symboli graficznych<input type="number" id="iconScale" step="0.1" min="0.3" max="1.5"></label><label class="f">Czcionka tekstu INFO<select id="fontInfo"></select></label></div><div id="fontInfoSample" style="color:var(--ink)"></div>
+        <input type="file" id="ttfFile" accept=".ttf,.otf,.woff" style="display:none"><div class="msg" id="fontMsg" style="display:none"></div>
+        <p class="hint">Własne czcionki (np. Arial z Windows) dodajesz w <b>Biblioteka → Czcionki</b>; pojawiają się we wszystkich listach. Wszystkie teksty w DXF to zamknięte kontury – wypełnienie ustawiasz w EZCAD.</p></div>
+      <div class="card"><h2>Podpis grupy – góra</h2><div id="grpTop"></div></div>
+      <div class="card"><h2>Podpis grupy – dół</h2><div id="grpBot"></div></div>
+      <div class="card"><h2>Informacje, QR, otwory</h2>
+        <label class="chk"><input type="checkbox" id="infoOn"> Tekst informacyjny w rogu maskownicy (warstwa INFO)</label>
+        <div class="row three"><label class="f">Wys. tekstu INFO mm<input type="number" id="infoH" step="0.5"></label><label class="f">Kod QR<select id="qrOn"><option value="0">Brak</option><option value="1">Prawy górny róg</option><option value="2">Lewy dolny róg</option><option value="3">Prawy dolny róg</option></select></label><label class="f">Bok QR mm<input type="number" id="qrSize" step="1"></label></div>
+        <div class="row three"><label class="f">Otwory mocowania<select id="holesOn"><option value="0">Brak</option><option value="4">4 w narożnikach</option><option value="6">6 (narożniki + środek)</option></select></label><label class="f">Średnica mm<input type="number" id="holeD" step="0.5"></label><label class="f">Od krawędzi mm<input type="number" id="holeOff" step="0.5"></label></div>
+      </div>
+    </div>
+
+    <div class="tab" id="tab-file">
+      <div class="card"><h2>DXF</h2>
+        <div class="row"><label class="f">Format<select id="dxfver"><option value="r12">R12 – POLYLINE (EZCAD)</option><option value="r2000">R2000 – LWPOLYLINE</option></select></label><label class="f">Punkt (0,0)<select id="origin"><option value="bl">Lewy dolny róg</option><option value="center">Środek (jak EZCAD)</option></select></label></div>
+        <h3>Warstwy</h3><div id="layers" class="row" style="grid-template-columns:1fr 1fr;gap:2px 8px"></div>
+        <div class="btns" style="margin-top:8px"><button id="btnExportItem">DXF maskownicy</button><button id="btnExportItems">DXF każdej maskownicy</button><button id="btnExportCab">DXF szafy</button><button class="primary" id="btnExportAll">DXF całości</button></div>
+      </div>
+      <div class="card"><h2>PDF</h2>
+        <div class="row three"><label class="f">Format<select id="pdfSize"><option value="A4">A4</option><option value="A3">A3</option></select></label><label class="f">Zakres<select id="pdfScope"><option value="all">Cała rozdzielnica</option><option value="cab">Zaznaczona szafa (układ)</option><option value="cabplus">Szafa + każda maskownica osobno</option><option value="item">Zaznaczona maskownica</option><option value="items">Każda maskownica – osobna strona</option></select></label><label class="f">Treść<select id="pdfMode"><option value="design">Projekt</option><option value="install">Montaż (modele)</option></select></label></div>
+        <div class="btns"><button class="primary" id="btnPdf">Zapisz PDF</button><button id="btnBom">Zestawienie aparatów (CSV)</button></div>
+        <p class="hint">Orientacja i skala dobierane automatycznie; tabelka rysunkowa z nazwą zlecenia, rozdzielnicy, datą i skalą.</p>
+      </div>
+      <div class="card"><h2>Pliki projektu</h2>
+        <div class="btns"><button class="small" id="btnJsonOut">Eksport rozdzielnicy (JSON)</button><button class="small" id="btnOrderOut">Eksport zlecenia (JSON)</button><button class="small" id="btnJsonIn">Import JSON</button><input type="file" id="jsonFile" accept=".json" style="display:none"></div>
+        <div class="btns"><button class="small" id="btnCsvNew">Import CSV – nowa rozdzielnica</button><button class="small" id="btnCsvAdd">Import CSV – dopisz szafy</button><button class="small" id="btnCsvOut">Eksport CSV</button><button class="small ghost" id="btnCsvSpec">Specyfikacja CSV</button><input type="file" id="csvFile" accept=".csv,.txt,.tsv" style="display:none"></div>
+        <div class="msg" id="csvMsg" style="display:none"></div>
+        <p class="hint">Pliki mają numer wersji formatu (<code>format</code>); nowe pola są tylko dodawane, nieznane ignorowane – starsza wersja programu wczyta nowszy plik.</p>
+      </div>
+      <div class="msg" id="dlMsg" style="display:none"></div>
+      <div class="card"><h2>Wersja offline / PWA</h2><div class="btns"><button class="small ghost" id="btnOffline">Zapisz aplikację jako plik HTML</button></div><p class="hint">Zainstalowana jako PWA (z hostingu https) zapisuje pliki .dxf bezpośrednio i działa bez internetu.</p></div>
+    </div>
+
+    <div class="editor" id="editor"></div>
+  </div>
+</main>
+<div class="toast" id="toast"></div>
+
+<!-- Orders modal -->
+<div class="modal" id="mOrders"><div class="box"><header><h2 style="margin:0">Zlecenia i rozdzielnice</h2><span class="spacer"></span><button class="small" id="btnNewOrder">+ Nowe zlecenie</button><button class="small ghost" data-close="mOrders">Zamknij</button></header>
+  <div class="body two"><div><h3>Zlecenia</h3><input id="orderSearch" placeholder="Szukaj…" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:4px;margin-bottom:6px"><div class="list" id="orderList"></div></div>
+  <div id="orderDetail"></div></div></div></div>
+<!-- Library modal -->
+<div class="modal" id="mLib"><div class="box"><header><h2 style="margin:0">Biblioteka</h2><div class="seg" style="margin-left:12px" id="libTabs"><button class="on" data-l="dev">Baza aparatów</button><button data-l="enc">Obudowy</button><button data-l="fonts">Czcionki</button><button data-l="icons">Symbole</button></div><span class="spacer"></span><button class="small ghost" data-close="mLib">Zamknij</button></header>
+  <div class="body" id="libDev"><p class="hint">Kod, nazwa domyślna, szerokość w modułach, prefiks symbolu, tabelka (standard = nazwa + symbol; 2/3/4 = równe pola bez symbolu), domyślny model (np. B16, C32). Model można zmienić dla każdego aparatu w projekcie.</p><table class="db" id="dbt"></table><div class="btns"><button class="small" id="btnAddDb">+ Aparat</button><button class="small ghost" id="btnResetDb">Przywróć domyślną bazę</button><button class="small ghost" id="btnDbOut">Eksport bazy</button><button class="small ghost" id="btnDbIn">Import bazy</button><input type="file" id="dbFile" accept=".json" style="display:none"></div></div>
+  <div class="body" id="libFonts" style="display:none"><p class="hint">Wgraj pliki TTF/OTF (np. z <code>C:\Windows\Fonts</code>: arial.ttf, arialbd.ttf, ARIALN.TTF). Czcionki zapisują się w bazie programu i synchronizują z Dyskiem Google. Teksty w DXF zawsze wychodzą jako zamknięte kontury.</p><table class="db" id="fontt"></table><div class="btns"><button class="small" id="btnAddFont">+ Dodaj czcionki</button><input type="file" id="fontFiles" accept=".ttf,.otf,.woff" multiple style="display:none"></div></div>
+  <div class="body" id="libIcons" style="display:none"><p class="hint">Symbole graficzne do ramek opisów – zamknięte kontury do wypełnienia. Własne symbole: plik SVG z prostymi ścieżkami (path/rect/circle/polygon) – najlepiej jednokolorowe ikony liniowe.</p><div id="iconGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px"></div><div class="btns" style="margin-top:10px"><button class="small" id="btnAddIcon">+ Dodaj symbol z SVG</button><input type="file" id="iconFiles" accept=".svg" multiple style="display:none"></div></div>
+  <div class="body" id="libEnc" style="display:none"><p class="hint">Obudowy: nazwa, szerokość, wysokość, cokół, typowe szerokości i wysokości maskownic (po przecinku). „+ Szafa z biblioteki” tworzy szafę z pustym polem i zaślepką wg tych danych.</p><table class="db" id="enct"></table><div class="btns"><button class="small" id="btnAddEnc">+ Obudowa</button></div></div></div></div>
+<!-- Settings modal -->
+<div class="modal" id="mSet"><div class="box" style="width:min(720px,100%)"><header><h2 style="margin:0">Ustawienia i synchronizacja</h2><span class="spacer"></span><button class="small ghost" data-close="mSet">Zamknij</button></header>
+  <div class="body">
+    <div class="card"><h2>Pamięć programu</h2><p class="hint" id="storInfo"></p><div class="btns"><button class="small" id="btnBackup">Kopia całej bazy (JSON)</button><button class="small" id="btnRestore">Odtwórz z kopii</button><input type="file" id="restoreFile" accept=".json" style="display:none"><button class="small ghost" id="btnTheme">Tryb ciemny / jasny</button></div></div>
+    <div class="card"><h2>Google Drive</h2><p class="hint">Synchronizacja zleceń i biblioteki w ukrytym folderze aplikacji na Twoim Dysku Google (appDataFolder). Wymaga jednorazowo Client ID OAuth z Google Cloud Console (typ „Web application”, dodaj adres, pod którym hostujesz aplikację, do „Authorized JavaScript origins”). Działa tylko z hostingu https – nie w podglądzie Claude ani z pliku lokalnego.</p>
+      <label class="f">Google OAuth Client ID<input id="gClientId" placeholder="xxxxx.apps.googleusercontent.com"></label>
+      <div class="btns" style="margin-top:8px"><button class="small" id="btnGSignIn">Zaloguj i synchronizuj</button><button class="small ghost" id="btnGSync">Synchronizuj teraz</button><button class="small ghost" id="btnGSignOut">Wyloguj</button></div>
+      <label class="chk"><input type="checkbox" id="gAuto"> Synchronizuj automatycznie po każdej zmianie</label>
+      <div class="msg" id="gMsg" style="display:none"></div></div>
+    <div class="card"><h2>Skróty</h2><p class="hint"><span class="kbd">Del</span> usuń · <span class="kbd">Ctrl+Z</span>/<span class="kbd">Ctrl+Y</span> cofnij/ponów · <span class="kbd">Ctrl+C</span>/<span class="kbd">Ctrl+V</span> kopiuj/wklej aparat lub maskownicę · <span class="kbd">←</span>/<span class="kbd">→</span> przesuń aparat · <span class="kbd">Shift+klik</span> wielozaznaczanie · kółko myszy / szczypanie = zoom, przeciąganie tła = przesuwanie</p></div>
+  </div></div></div>
+<!-- Check modal -->
+<div class="modal" id="mCheck"><div class="box" style="width:min(640px,100%)"><header><h2 style="margin:0">Kontrola projektu</h2><span class="spacer"></span><button class="small ghost" data-close="mCheck">Zamknij</button></header><div class="body"><div class="list issues" id="issues"></div></div></div></div>
+
+<script id="hershey" type="application/json">__HERSHEY__</script>
+<script id="fontlib" type="application/json">__FONTS__</script>
+<script>__OPENTYPE__</script>
+<script>__QR__</script>
+<script>__ICONS__</script>
+<script>
+const APP_NAME='eitLab FrontPanel', APP_VER='5.1', FORMAT=3;
+const SOURCE = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
+const $ = id=>document.getElementById(id);
+const uid = ()=>Math.random().toString(36).slice(2,9);
+const f = n => (Math.round(n*1000)/1000).toString();
+__TEXTENGINE__
+__BODY__
+</script>
+</body>
+</html>
