@@ -2647,7 +2647,7 @@ function svgToContours(svgText){ const doc=new DOMParser().parseFromString(svgTe
 function iconSvgPreview(id, size){ const polys=iconPolys(id,2,2,(size||40)-4,(size||40)-4,'ICON'); return `<svg viewBox="0 0 ${size||40} ${size||40}" width="${size||40}" height="${size||40}"><path d="${polys.map(p=>p.pts.map((q,i)=>(i?'L':'M')+f(q[0])+' '+f(q[1])).join('')+'Z').join(' ')}" fill="currentColor" fill-rule="evenodd"/></svg>`; }
 </script>
 <script>
-const APP_NAME='eitLab FrontPanel', APP_VER='5.2', FORMAT=3;
+const APP_NAME='eitLab FrontPanel', APP_VER='5.3', FORMAT=3;
 const SOURCE = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
 const $ = id=>document.getElementById(id);
 const uid = ()=>Math.random().toString(36).slice(2,9);
@@ -2782,7 +2782,7 @@ function defaultGrp(side){ return {lineType:side==='top'?'dash':'dot', dash:'2/1
 function newGroup(name, align){ return {id:uid(), name:name||'', bot:'', align:align||'left', x:0, devices:[]}; }
 function newRow(){ return {mod:24, nicheH:45, nicheY:null, pos:'block', groups:[]}; }
 function newItem(type, cab){ const w = type==='empty'? cab.w : Math.min(cab.w, 600); const it={id:uid(), type, w, h: type==='cover'?150: type==='blank'?150: type==='plate'?400:100}; if(type==='cover') it.row=newRow(); return it; }
-function newCab(){ return {id:uid(), w:750, h:2000, plinth:0, door:false, items:[]}; }
+function newCab(){ return {id:uid(), w:750, h:2000, plinth:0, door:false, hinge:'left', leaves:1, items:[]}; }
 function newBoard(){ const B={format:FORMAT, app:APP_NAME, id:uid(), name:'Rozdzielnica', tag:'RG', revision:'A', pitch:17.5, cabGap:0, label:defaultLabel(), grpTop:defaultGrp('top'), grpBot:defaultGrp('bot'), info:{on:true,h:3}, qr:{pos:0,size:15}, holes:{n:0,d:5,off:10}, cabinets:[], updated:Date.now()}; const c=newCab(); B.cabinets.push(c); c.items.push(newItem('empty',c)); c.items.push(newItem('cover',c)); return B; }
 function newOrder(){ return {format:FORMAT, id:uid(), number:'', client:'', object:'', address:'', contact:'', phone:'', email:'', dateStart:new Date().toISOString().slice(0,10), dateDue:'', status:'nowe', notes:'', created:Date.now(), updated:Date.now()}; }
 let P=newBoard(), ORDER=newOrder(), DB=JSON.parse(JSON.stringify(DEFAULT_DB)), ENC=JSON.parse(JSON.stringify(DEFAULT_ENC)), SETTINGS={theme:'light',gClientId:'',gAuto:false};
@@ -2997,7 +2997,7 @@ function renderCanvas(){
     s+=`<rect x="${x0+e}" y="${e}" width="${c.w-2*e}" height="${c.h-2*e}" fill="var(--cab-inner)" stroke="var(--cab-edge)" stroke-width=".6" vector-effect="non-scaling-stroke"/>`;
     s+=`<text x="${x0+c.w/2}" y="${-3}" font-size="${Math.max(6,W/80)}" text-anchor="middle" fill="var(--ink-2)">Szafa ${ci+1} · ${c.w}×${c.h}${c.plinth?' + cokół '+c.plinth:''}</text>`;
     const used=c.items.reduce((a,i)=>a+i.h,0); if(used>c.h) s+=`<text x="${x0+c.w/2}" y="${cabTotalH(c)+12}" font-size="${Math.max(6,W/80)}" text-anchor="middle" fill="var(--danger)">Elementy wyższe niż szafa (${used} mm)</text>`;
-    if(MODE==='door'||c.door){ s+=`<rect x="${x0+e*0.6}" y="${e*0.6}" width="${c.w-e*1.2}" height="${c.h-e*1.2}" rx="${e*0.4}" fill="var(--door)" stroke="var(--cab-edge)" stroke-width="1" vector-effect="non-scaling-stroke"/><rect x="${x0+c.w-e*3.2}" y="${c.h/2-e*2.5}" width="${e*0.9}" height="${e*5}" rx=".5" fill="var(--cab-edge)"/></g>`; return; }
+    if(MODE==='door'||c.door){ s+=doorSvg(c,x0,e)+`</g>`; return; }
     c.items.forEach((it,ii)=>{ const b=itemBox(c,it); const sel=it===selItem;
       s+=`<g class="item${sel?' sel':''}" data-item="${it.id}">`;
       if(it.type==='empty') s+=`<rect class="box" x="${b.x+e}" y="${b.y+e*0.5}" width="${b.w-2*e}" height="${Math.max(0,b.h-e)}" fill="var(--empty)" stroke="var(--cab-edge)" stroke-width=".4" stroke-dasharray="4 3" vector-effect="non-scaling-stroke"/>`;
@@ -3029,9 +3029,17 @@ function renderCanvas(){
   $('canvas').innerHTML=s; $('stats').textContent=`${P.cabinets.length} szaf · ${coverItems().length} maskownic · ${nDev} aparatów · ${Math.round(ZOOM.k*100)}%`;
   FITMAP=new Map(); for(const x of FIT_LOG) if(x.tag){ const prev=FITMAP.get(x.tag); if(!prev||x.k<prev.k) FITMAP.set(x.tag,x); } FIT_LOG=null;
 }
+function doorSvg(c,x0,e){ const leaves=c.leaves===2?2:1; const hinge=c.hinge==='right'?'right':'left'; const m=e*0.6; const H=c.h-2*m; let s='';
+  const handle=(hx,hy,dir)=>{ const u=Math.max(8,Math.min(22,c.w/32)); const bx=hx-u*0.5; return `<rect x="${bx}" y="${hy-u*2.2}" width="${u}" height="${u*4.4}" rx="${u*0.3}" fill="var(--cab-edge)" opacity=".85"/><circle cx="${hx}" cy="${hy-u*1.4}" r="${u*0.3}" fill="var(--door)"/><rect x="${dir>0?hx-u*0.2:hx-u*2.6}" y="${hy-u*0.35}" width="${u*2.8}" height="${u*0.7}" rx="${u*0.3}" fill="var(--cab-edge)"/><circle cx="${hx}" cy="${hy+u*1.5}" r="${u*0.32}" fill="none" stroke="var(--door)" stroke-width="${u*0.12}"/>`; };
+  const hinges=(hx)=>[0.12,0.5,0.88].map(t=>`<rect x="${hx-e*0.35}" y="${m+H*t-e*1.2}" width="${e*0.7}" height="${e*2.4}" rx="${e*0.2}" fill="var(--cab-edge)" opacity=".7"/>`).join('');
+  if(leaves===1){ s+=`<rect x="${x0+m}" y="${m}" width="${c.w-2*m}" height="${H}" rx="${e*0.4}" fill="var(--door)" stroke="var(--cab-edge)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>`; s+=`<rect x="${x0+m+e*1.2}" y="${m+e*1.2}" width="${c.w-2*m-e*2.4}" height="${H-e*2.4}" rx="${e*0.3}" fill="none" stroke="var(--cab-edge)" stroke-width=".4" opacity=".5" vector-effect="non-scaling-stroke"/>`;
+    const hx= hinge==='left'? x0+c.w-m-e*2.6 : x0+m+e*2.6; s+=handle(hx, c.h*0.5, hinge==='left'?-1:1); s+=hinges(hinge==='left'? x0+m : x0+c.w-m); }
+  else { const lw=(c.w-2*m)/2; for(let i=0;i<2;i++){ const lx=x0+m+i*lw; s+=`<rect x="${lx}" y="${m}" width="${lw-(i===0?e*0.15:0)}" height="${H}" rx="${e*0.3}" fill="var(--door)" stroke="var(--cab-edge)" stroke-width="1.2" vector-effect="non-scaling-stroke"/>`; }
+    s+=handle(x0+m+lw-e*2.2, c.h*0.5, -1); s+=`<rect x="${x0+m+lw+e*1.2}" y="${c.h*0.5-e*2.2}" width="${e*0.9}" height="${e*4.4}" rx=".5" fill="var(--cab-edge)" opacity=".85"/>`; s+=hinges(x0+m)+hinges(x0+c.w-m); }
+  return s; }
 function renderCrumb(){ $('crumb').innerHTML=`<span>${esc(ORDER.number||'(bez numeru)')}${ORDER.client?' · '+esc(ORDER.client):''}</span><span>›</span><b>${esc(P.name)}${P.tag?' '+esc(P.tag):''}</b>`; }
 function renderCabs(){ $('cabs').innerHTML=P.cabinets.map((c,i)=>`<div class="it${c===selCab?' on':''}" data-cab="${c.id}"><span class="grow"><b>Szafa ${i+1}</b> · ${c.w}×${c.h}${c.plinth?' +'+c.plinth:''} · ${c.items.length} el.</span><button class="small ghost icon" data-act="left" title="W lewo">◀</button><button class="small ghost icon" data-act="right" title="W prawo">▶</button><button class="small ghost icon" data-act="dup" title="Duplikuj">⧉</button><button class="small danger icon" data-act="del">×</button></div>`).join('')||'<div class="it">Brak szaf</div>';
-  const c=selCab; $('cabEdit').innerHTML= c? `<div class="row three" style="margin-top:8px"><label class="f">Szerokość mm<input type="number" data-cf="w" value="${c.w}" step="10"></label><label class="f">Wysokość mm<input type="number" data-cf="h" value="${c.h}" step="10"></label><label class="f">Cokół / fundament mm<input type="number" data-cf="plinth" value="${c.plinth||0}" step="10" min="0"></label></div><label class="chk"><input type="checkbox" data-cf="door" ${c.door?'checked':''}> Pokazuj z zamkniętymi drzwiami</label>`:''; }
+  const c=selCab; $('cabEdit').innerHTML= c? `<div class="row three" style="margin-top:8px"><label class="f">Szerokość mm<input type="number" data-cf="w" value="${c.w}" step="10"></label><label class="f">Wysokość mm<input type="number" data-cf="h" value="${c.h}" step="10"></label><label class="f">Cokół / fundament mm<input type="number" data-cf="plinth" value="${c.plinth||0}" step="10" min="0"></label></div><div class="row three"><label class="f">Zawiasy<select data-cf="hinge"><option value="left" ${(c.hinge||'left')==='left'?'selected':''}>Po lewej (klamka po prawej)</option><option value="right" ${c.hinge==='right'?'selected':''}>Po prawej (klamka po lewej)</option></select></label><label class="f">Skrzydła<select data-cf="leaves"><option value="1" ${(c.leaves||1)===1?'selected':''}>Jedno</option><option value="2" ${c.leaves===2?'selected':''}>Dwa</option></select></label><label class="chk" style="align-self:end"><input type="checkbox" data-cf="door" ${c.door?'checked':''}> Zawsze z drzwiami</label></div>`:''; }
 function renderItems(){ const c=selCab; if(!c){ $('items').innerHTML='<div class="it">Zaznacz szafę</div>'; $('itemEdit').innerHTML=''; return; }
   const used=c.items.reduce((a,i)=>a+i.h,0);
   $('items').innerHTML=c.items.map((it,i)=>`<div class="it${it===selItem?' on':''}" data-item="${it.id}"><span class="grow"><span class="tag">${i+1}</span> ${esc(ITEM_NAMES[it.type])} <b>${it.w}×${it.h}</b>${it.type==='cover'?` · ${rowDevices(it.row).reduce((a,d)=>a+d.mod,0)}/${it.row.mod} mod`:''}</span><button class="small ghost icon" data-act="up">▲</button><button class="small ghost icon" data-act="down">▼</button><button class="small danger icon" data-act="del">×</button></div>`).join('')+`<div class="it" style="cursor:default;color:${used>c.h?'var(--danger)':'var(--ink-2)'}">Razem ${used} / ${c.h} mm${used<c.h?` · wolne ${c.h-used} mm`:''}</div>`;
@@ -3088,7 +3096,7 @@ function migrateBoard(b){ if(b.rows&&!b.cabinets){ const c=newCab(); c.w=(b.fron
   const nb=newBoard(); nb.cabinets=[]; const B=Object.assign(nb,b); B.format=FORMAT; B.label=Object.assign(defaultLabel(),B.label||{}); B.grpTop=Object.assign(defaultGrp('top'),B.grpTop||{}); B.grpBot=Object.assign(defaultGrp('bot'),B.grpBot||{});
   const L=B.label; if(!L.cellH) L.cellH=2.2; if(L.lineW!=null&&L.lwMain==null){ L.lwMain=L.lineW; L.lwDivV=L.lineW; L.lwDivH=L.lineW; } if(L.div!=null&&L.divV==null){ L.divV=L.div; L.divH=L.div; }
   if(!B.cabinets.length) B.cabinets.push(newCab());
-  for(const c of B.cabinets){ if(c.plinth==null) c.plinth=0; for(const it of c.items) if(it.type==='cover'){ const r=it.row; if(!r.groups){ const groups=[]; let cur=null; for(const d of (r.devices||[])){ const gn=d.group||''; if(!cur||cur.name!==gn){ cur=newGroup(gn,'left'); groups.push(cur); } cur.devices.push(d); } r.groups=groups; delete r.devices; }
+  for(const c of B.cabinets){ if(c.plinth==null) c.plinth=0; if(!c.hinge) c.hinge='left'; if(!c.leaves) c.leaves=1; for(const it of c.items) if(it.type==='cover'){ const r=it.row; if(!r.groups){ const groups=[]; let cur=null; for(const d of (r.devices||[])){ const gn=d.group||''; if(!cur||cur.name!==gn){ cur=newGroup(gn,'left'); groups.push(cur); } cur.devices.push(d); } r.groups=groups; delete r.devices; }
       for(const g of r.groups){ if(g.bot==null) g.bot=''; for(const d of g.devices){ if(!d.table) d.table = d.ncell>1 ? (d.layout==='cols'?'c':'r')+Math.min(4,d.ncell) : 'std'; if(d.rating==null) d.rating=''; } } if(!r.pos) r.pos='block'; } }
   if(B.db){ delete B.db; } return B; }
 
@@ -3241,7 +3249,7 @@ $('cabs').addEventListener('click',e=>{ const it=e.target.closest('.it'); if(!it
   if(b.dataset.act==='dup'){ const n=reid(JSON.parse(JSON.stringify(c))); P.cabinets.splice(i+1,0,n); selCab=n; selItem=null; selGrp=null; selDev=null; }
   change(); });
 function reid(obj){ if(Array.isArray(obj)) obj.forEach(reid); else if(obj&&typeof obj==='object'){ if(obj.id) obj.id=uid(); if(obj.auto!==false&&obj.symbol!=null&&obj.code) obj.symbol=''; for(const k in obj) reid(obj[k]); } return obj; }
-$('cabEdit').addEventListener('change',e=>{ const k=e.target.dataset.cf; if(!k||!selCab) return; snapshot(); if(k==='door') selCab.door=e.target.checked; else if(k==='plinth') selCab.plinth=Math.max(0,+e.target.value||0); else selCab[k]=Math.max(10,+e.target.value||10); change(); });
+$('cabEdit').addEventListener('change',e=>{ const k=e.target.dataset.cf; if(!k||!selCab) return; snapshot(); if(k==='door') selCab.door=e.target.checked; else if(k==='hinge') selCab.hinge=e.target.value; else if(k==='leaves') selCab.leaves=+e.target.value; else if(k==='plinth') selCab.plinth=Math.max(0,+e.target.value||0); else selCab[k]=Math.max(10,+e.target.value||10); change(); });
 // items
 document.querySelectorAll('button[data-add]').forEach(b=>b.onclick=()=>{ if(!selCab){ toast('Najpierw zaznacz szafę'); return; } snapshot(); const it=newItem(b.dataset.add, selCab); selCab.items.push(it); selItem=it; selGrp=null; selDev=null; change(); });
 $('items').addEventListener('click',e=>{ const el=e.target.closest('.it'); if(!el||!el.dataset.item) return; const it=selCab.items.find(x=>x.id===el.dataset.item); if(!it) return; const b=e.target.closest('button'); const i=selCab.items.indexOf(it);
@@ -3478,7 +3486,7 @@ PROJEKT; nazwa; oznaczenie; rewizja
 ZLECENIE; numer; klient; obiekt; adres            – (opcjonalnie) dane zlecenia
 MODUL; 17.5                                       – podziałka modułu mm
 ODSTEP; 0                                         – odstęp między szafami mm
-SZAFA; szerokość; wysokość; cokół                 – nowa szafa; cokół w mm (0 = brak)
+SZAFA; szerokość; wysokość; cokół; zawiasy; skrzydła   – cokół w mm (0 = brak); zawiasy: lewa | prawa; skrzydła: 1 | 2 (opcjonalne)
 PUSTE; wysokość [; szerokość]
 PLYTA; szerokość; wysokość
 ZASLEPKA; szerokość; wysokość
@@ -3538,7 +3546,7 @@ function parseCsv(text){
       case 'ZLECENIE': case 'ORDER': out.order={number:a[0]||'',client:a[1]||'',object:a[2]||'',address:a[3]||''}; break;
       case 'MODUL': case 'PITCH': out.pitch=num(a[0],null); break;
       case 'ODSTEP': case 'GAP': out.cabGap=num(a[0],null); break;
-      case 'SZAFA': case 'CABINET': cab=newCab(); cab.w=num(a[0],750); cab.h=num(a[1],2000); cab.plinth=num(a[2],0); out.cabinets.push(cab); cover=null; grp=null; break;
+      case 'SZAFA': case 'CABINET': cab=newCab(); cab.w=num(a[0],750); cab.h=num(a[1],2000); cab.plinth=num(a[2],0); cab.hinge=(norm(a[3])==='PRAWA'||norm(a[3])==='RIGHT'||norm(a[3])==='P')?'right':'left'; cab.leaves=num(a[4],1)===2?2:1; out.cabinets.push(cab); cover=null; grp=null; break;
       case 'PUSTE': case 'EMPTY': needCab(); cab.items.push({id:uid(),type:'empty',w:num(a[1],cab.w),h:num(a[0],100)}); cover=null; grp=null; break;
       case 'PLYTA': case 'PLATE': needCab(); cab.items.push({id:uid(),type:'plate',w:num(a[0],cab.w),h:num(a[1],400)}); cover=null; grp=null; break;
       case 'ZASLEPKA': case 'BLANK': needCab(); cab.items.push({id:uid(),type:'blank',w:num(a[0],cab.w),h:num(a[1],150)}); cover=null; grp=null; break;
@@ -3571,7 +3579,7 @@ function tableOut(t){ if(!t||t==='std') return ''; return t[1]+(t[0]==='c'?'obok
 function exportCsv(only){ const q=v=>String(v==null?'':v).replace(/;/g,','); const L=P.label; if(only){ const r=only.row; const pos=r.pos==='niche'?'srodek': r.pos==='top'?(r.nicheY==null?'blok':r.nicheY):'blok'; let o=[`# ${APP_NAME} – opisy rzędu`,`MASKOWNICA; ${only.w}; ${only.h}; ${r.mod}; ${r.nicheH}; ${pos}`]; const gx=groupX(r); for(const g of r.groups){ o.push(`GRUPA; ${q(g.name)}; ${g.align==='left'?'lewa':g.align==='right'?'prawa':gx.get(g.id)}; ${q(g.bot)}`); for(const d of g.devices) o.push(`APARAT; ${q(d.code)}; ${d.auto===false?q(d.symbol):''}; ${q(d.name)}; ; ${tableOut(d.table)}; ${d.mod}; ${d.symH||''}; ${d.nameH||''}; ${q(d.rating)}; ${q(d.icon||'')}; ${d.icon?(d.iconPos||'left'):''}`); } return o.join('\n')+'\n'; }
   let o=[`# ${APP_NAME} ${APP_VER} – eksport ${new Date().toLocaleString('pl-PL')} (format CSV v3)`,`PROJEKT; ${q(P.name)}; ${q(P.tag)}; ${q(P.revision)}`,`ZLECENIE; ${q(ORDER.number)}; ${q(ORDER.client)}; ${q(ORDER.object)}; ${q(ORDER.address)}`,`MODUL; ${P.pitch}`,`ODSTEP; ${P.cabGap||0}`,`RAMKA; ${L.h}; ${L.gap}; ${L.symH}; ${L.nameH}; ${L.lwMain}; ${L.frameR}; ${L.split}; ${L.lwDivV}; ${L.lwDivH}`];
   for(const d of DB) o.push(`BAZA; ${q(d.code)}; ${q(d.name)}; ${d.mod}; ${q(d.prefix)}; ${tableOut(d.table)||'std'}; ${q(d.rating)}${d.blank?'; zaslepka':''}`);
-  for(const c of P.cabinets){ o.push(`SZAFA; ${c.w}; ${c.h}; ${c.plinth||0}`); for(const it of c.items){
+  for(const c of P.cabinets){ o.push(`SZAFA; ${c.w}; ${c.h}; ${c.plinth||0}; ${c.hinge==='right'?'prawa':'lewa'}; ${c.leaves===2?2:1}`); for(const it of c.items){
     if(it.type==='empty') o.push(`PUSTE; ${it.h}; ${it.w}`); else if(it.type==='plate') o.push(`PLYTA; ${it.w}; ${it.h}`); else if(it.type==='blank') o.push(`ZASLEPKA; ${it.w}; ${it.h}`);
     else { const r=it.row; const pos=r.pos==='niche'?'srodek': r.pos==='top'?(r.nicheY==null?'blok':r.nicheY):'blok'; o.push(`MASKOWNICA; ${it.w}; ${it.h}; ${r.mod}; ${r.nicheH}; ${pos}`); const gx=groupX(r);
       for(const g of r.groups){ o.push(`GRUPA; ${q(g.name)}; ${g.align==='left'?'lewa':g.align==='right'?'prawa':gx.get(g.id)}; ${q(g.bot)}`);

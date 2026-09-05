@@ -1,5 +1,8 @@
 # Historia zmian
 
+## 5.3 (2026-09-05)
+- Widok drzwi: wyraźna klamka z zamkiem, zawiasy, wybór strony zawiasów (klamka po lewej/prawej) i drzwi dwuskrzydłowe per szafa; kolumny zawiasy/skrzydła w CSV (SZAFA)
+
 ## 5.2 (2026-09-05)
 - Pozioma tabela opisów pod widokiem maskownicy (przycisk „Tabela opisów”): kolumny = aparaty w kolejności na maskownicy, wiersze: symbol, nazwa/pola, model, grupa (podpis górny i dolny), ikona; Tab/Enter – następny aparat, ↓/↑ – wiersz; podświetlenie aparat ↔ kolumna; przejście do poprzedniej/następnej maskownicy
 - Kontrola mieszczenia się tekstu na żywo: pole na czerwono (z podpowiedzią, do ilu % zmniejszono) i czerwony tekst na rysunku
