@@ -1,5 +1,8 @@
 # Historia zmian
 
+## 5.4 (2026-09-05)
+- Klamka drzwi jak w rzeczywistej szafie (uchylna, 26×140 mm, zamek u dołu) o stałej wielkości niezależnie od szafy; numer wersji przy tytule
+
 ## 5.3 (2026-09-05)
 - Widok drzwi: wyraźna klamka z zamkiem, zawiasy, wybór strony zawiasów (klamka po lewej/prawej) i drzwi dwuskrzydłowe per szafa; kolumny zawiasy/skrzydła w CSV (SZAFA)
 
