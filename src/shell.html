@@ -41,6 +41,7 @@ button:focus-visible,input:focus,select:focus,textarea:focus{outline:2px solid v
 main{display:grid;grid-template-columns:1fr 400px;height:calc(100vh - 52px)}
 .stage{position:relative;overflow:hidden;padding:10px 12px;background:var(--panel);display:flex;flex-direction:column;min-height:0}
 .stage svg{display:block;width:auto;max-width:100%;max-height:100%;margin:0 auto;touch-action:none;user-select:none;flex:1;min-height:0}
+.stage.tbl svg{max-height:100%}
 #canvas{flex:1;min-height:0;display:flex}
 .stagebar{display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap}
 .seg{display:inline-flex;border:1.5px solid var(--ink);border-radius:4px;overflow:hidden;background:var(--card)}
@@ -106,6 +107,21 @@ svg text{font-family:var(--font-body)}
 .issues .it{cursor:default}
 .kbd{font:11px ui-monospace,monospace;border:1px solid var(--line);border-radius:3px;padding:0 4px;background:var(--white)}
 .drawer-btn{display:none}
+#tableWrap{flex:0 0 auto;max-height:46%;overflow:auto;border:1.5px solid var(--ink);border-radius:6px;background:var(--card);margin-top:8px}
+#tableWrap .tb{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--line);position:sticky;left:0;top:0;background:var(--card);z-index:2;flex-wrap:wrap}
+#tableWrap table{border-collapse:collapse;font-size:13px;table-layout:fixed}
+#tableWrap th,#tableWrap td{border:1px solid var(--line);padding:3px;vertical-align:top}
+#tableWrap th{font-weight:500;color:var(--ink-2);text-align:left;background:var(--panel-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#tableWrap th.dev{cursor:pointer;font-size:12px}
+#tableWrap th.dev.sel,#tableWrap td.sel{background:color-mix(in srgb,var(--sel) 14%,var(--white))}
+#tableWrap th.lab{position:sticky;left:0;background:var(--panel-2);z-index:1;width:96px}
+#tableWrap input,#tableWrap select{width:100%;min-height:34px;padding:4px 6px;border:1px solid var(--line);border-radius:3px;background:var(--white);color:var(--ink);font-size:13px}
+#tableWrap input.bad{color:var(--danger);border-color:var(--danger);background:#fff3f3}
+#tableWrap input.rng{background:color-mix(in srgb,var(--sel) 18%,var(--white))}
+#tableWrap td.blank{background:var(--panel);color:var(--ink-2);font-size:11px;text-align:center}
+#tableWrap .stack{display:flex;flex-direction:column;gap:3px}
+#tableWrap .pair{display:flex;gap:3px}
+svg .shrunk{fill:var(--danger)!important;stroke:var(--danger)!important}
 @media (max-width:1100px){
   main{grid-template-columns:1fr 360px}
 }
@@ -142,9 +158,11 @@ svg text{font-family:var(--font-body)}
       <div class="seg" id="view"><button class="on" data-v="all">Rozdzielnica</button><button data-v="cab">Szafa</button><button data-v="item">Maskownica</button></div>
       <div class="seg" id="mode"><button class="on" data-m="design">Projekt</button><button data-m="install">Montaż</button><button data-m="door">Drzwi</button></div>
       <div class="seg"><button id="zoomOut" title="Oddal">−</button><button id="zoomIn" title="Przybliż">+</button><button id="zoomReset" title="Dopasuj">⤢</button></div>
+      <button class="small" id="btnTable" title="Tabela opisów maskownicy">Tabela opisów</button>
       <span id="stats" style="font-size:12px;color:var(--ink-2);margin-left:auto"></span>
     </div>
     <div id="canvas"></div>
+    <div id="tableWrap" style="display:none"></div>
   </div>
   <div class="side" id="side">
     <div class="tabs">
@@ -183,6 +201,7 @@ svg text{font-family:var(--font-body)}
     <div class="tab" id="tab-dev">
       <div class="card"><h2>Dodaj aparat</h2><div id="devTarget" class="hint"></div><div class="pal" id="pal"></div>
         <p class="hint">Bazę aparatów (kody, moduły, tabelki, modele) edytujesz w <b>Bibliotece</b> (przycisk w nagłówku).</p></div>
+      <div class="card"><h2>Wzorce grup i maskownic</h2><div id="tplList" class="list"></div><p class="hint">Wzorzec zapisujesz z edycji grupy („Zapisz jako wzorzec”) lub maskownicy. Zarządzanie: Biblioteka → Wzorce.</p></div>
       <div class="card"><h2>Zaznaczone aparaty</h2><div id="multi" class="hint">Kliknij aparat na rysunku. Shift+klik zaznacza kilka.</div></div>
     </div>
 
@@ -243,10 +262,11 @@ svg text{font-family:var(--font-body)}
   <div class="body two"><div><h3>Zlecenia</h3><input id="orderSearch" placeholder="Szukaj…" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:4px;margin-bottom:6px"><div class="list" id="orderList"></div></div>
   <div id="orderDetail"></div></div></div></div>
 <!-- Library modal -->
-<div class="modal" id="mLib"><div class="box"><header><h2 style="margin:0">Biblioteka</h2><div class="seg" style="margin-left:12px" id="libTabs"><button class="on" data-l="dev">Baza aparatów</button><button data-l="enc">Obudowy</button><button data-l="fonts">Czcionki</button><button data-l="icons">Symbole</button></div><span class="spacer"></span><button class="small ghost" data-close="mLib">Zamknij</button></header>
+<div class="modal" id="mLib"><div class="box"><header><h2 style="margin:0">Biblioteka</h2><div class="seg" style="margin-left:12px" id="libTabs"><button class="on" data-l="dev">Baza aparatów</button><button data-l="enc">Obudowy</button><button data-l="fonts">Czcionki</button><button data-l="icons">Symbole</button><button data-l="tpl">Wzorce</button></div><span class="spacer"></span><button class="small ghost" data-close="mLib">Zamknij</button></header>
   <div class="body" id="libDev"><p class="hint">Kod, nazwa domyślna, szerokość w modułach, prefiks symbolu, tabelka (standard = nazwa + symbol; 2/3/4 = równe pola bez symbolu), domyślny model (np. B16, C32). Model można zmienić dla każdego aparatu w projekcie.</p><table class="db" id="dbt"></table><div class="btns"><button class="small" id="btnAddDb">+ Aparat</button><button class="small ghost" id="btnResetDb">Przywróć domyślną bazę</button><button class="small ghost" id="btnDbOut">Eksport bazy</button><button class="small ghost" id="btnDbIn">Import bazy</button><input type="file" id="dbFile" accept=".json" style="display:none"></div></div>
   <div class="body" id="libFonts" style="display:none"><p class="hint">Wgraj pliki TTF/OTF (np. z <code>C:\Windows\Fonts</code>: arial.ttf, arialbd.ttf, ARIALN.TTF). Czcionki zapisują się w bazie programu i synchronizują z Dyskiem Google. Teksty w DXF zawsze wychodzą jako zamknięte kontury.</p><table class="db" id="fontt"></table><div class="btns"><button class="small" id="btnAddFont">+ Dodaj czcionki</button><input type="file" id="fontFiles" accept=".ttf,.otf,.woff" multiple style="display:none"></div></div>
   <div class="body" id="libIcons" style="display:none"><p class="hint">Symbole graficzne do ramek opisów – zamknięte kontury do wypełnienia. Własne symbole: plik SVG z prostymi ścieżkami (path/rect/circle/polygon) – najlepiej jednokolorowe ikony liniowe.</p><div id="iconGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:10px"></div><div class="btns" style="margin-top:10px"><button class="small" id="btnAddIcon">+ Dodaj symbol z SVG</button><input type="file" id="iconFiles" accept=".svg" multiple style="display:none"></div></div>
+  <div class="body" id="libTpl" style="display:none"><p class="hint">Powtarzalne zestawy: grupa aparatów (z podpisami, nazwami, modelami, ikonami) albo cała maskownica. Symbole nadają się na nowo po wstawieniu, chyba że wzorzec ma zaznaczone „zachowaj symbole”.</p><table class="db" id="tplt"></table><div class="btns"><button class="small ghost" id="btnTplOut">Eksport wzorców</button><button class="small ghost" id="btnTplIn">Import wzorców</button><input type="file" id="tplFile" accept=".json" style="display:none"></div></div>
   <div class="body" id="libEnc" style="display:none"><p class="hint">Obudowy: nazwa, szerokość, wysokość, cokół, typowe szerokości i wysokości maskownic (po przecinku). „+ Szafa z biblioteki” tworzy szafę z pustym polem i zaślepką wg tych danych.</p><table class="db" id="enct"></table><div class="btns"><button class="small" id="btnAddEnc">+ Obudowa</button></div></div></div></div>
 <!-- Settings modal -->
 <div class="modal" id="mSet"><div class="box" style="width:min(720px,100%)"><header><h2 style="margin:0">Ustawienia i synchronizacja</h2><span class="spacer"></span><button class="small ghost" data-close="mSet">Zamknij</button></header>
@@ -268,7 +288,7 @@ svg text{font-family:var(--font-body)}
 <script>__QR__</script>
 <script>__ICONS__</script>
 <script>
-const APP_NAME='eitLab FrontPanel', APP_VER='5.1', FORMAT=3;
+const APP_NAME='eitLab FrontPanel', APP_VER='5.2', FORMAT=3;
 const SOURCE = '<!DOCTYPE html>\n' + document.documentElement.outerHTML;
 const $ = id=>document.getElementById(id);
 const uid = ()=>Math.random().toString(36).slice(2,9);

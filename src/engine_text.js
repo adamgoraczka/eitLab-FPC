@@ -81,10 +81,11 @@ function fitText(text, capH, x, y, w, h, pad, layer, fnt, opt){
   const gap = capH*0.35; const rs = lines.map(t=>textPolys(t, capH, fnt));
   const total = capH*lines.length + gap*(lines.length-1); const maxW = Math.max(...rs.map(r=>r.width));
   let k=1; if (maxW>w-2*pad) k=Math.min(k,(w-2*pad)/maxW); if (total>h-2*pad) k=Math.min(k,(h-2*pad)/total);
-  if(k<0.999&&FIT_LOG&&!(opt&&opt.box)) FIT_LOG.push({text, capH, k, layer});
+  if(k<0.999&&FIT_LOG&&!(opt&&opt.box)) FIT_LOG.push({text, capH, k, layer, tag:opt&&opt.tag});
+  const shrunk=k<0.999;
   let out=[]; let top = y + h/2 - total*k/2;
   rs.forEach((r,i)=>{ const base = top + capH*k; const tw=r.width*k; const x0 = (opt&&opt.align==='left')? x+pad : (opt&&opt.align==='right')? x+w-pad-tw : x + w/2 - tw/2;
-    out = out.concat(r.polys.map(p=>({closed:p.closed, layer, outline:isOutlineFont(resolveFont(fnt||P.label.font)), pts:p.pts.map(q=>[x0+q[0]*k, base+q[1]*k])})));
+    out = out.concat(r.polys.map(p=>({closed:p.closed, layer, shrunk, outline:isOutlineFont(resolveFont(fnt||P.label.font)), pts:p.pts.map(q=>[x0+q[0]*k, base+q[1]*k])})));
     top = base + gap*k; });
   return out;
 }

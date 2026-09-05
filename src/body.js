@@ -86,6 +86,7 @@ function grpTextGeom(G, name, xa, xb, yLine, side, layerT, layerL){ // returns p
   const pos=G.textPos||'above';
   if(pos==='inline'&&name){ if(tx-pad>x1) polys.push(...patterned(x1,yLine,tx-pad,yLine,layerL,G)); if(tx+tw+pad<x2) polys.push(...patterned(tx+tw+pad,yLine,x2,yLine,layerL,G)); polys.push(...fitText(name,th,tx,yLine-th*0.8,tw+0.01,th*1.6,0,layerT,fnt)); }
   else { polys.push(...patterned(x1,yLine,x2,yLine,layerL,G)); if(name){ const ty = pos==='above'? yLine-(G.offset||0)-th*1.35 : yLine+(G.offset||0)+th*0.15; polys.push(...fitText(name,th,tx,ty,tw+0.01,th*1.2,0,layerT,fnt)); } }
+  if(tw>x2-x1&&FIT_LOG) FIT_LOG.push({text:name,capH:th,k:(x2-x1)/tw,layer:layerT,tag:'grp:'+(side==='top'?'name':'bot')+':'+(G._gid||'')});
   return polys; }
 function grpSpaceOf(G, hasName){ const th=G.size||2.8; const pos=G.textPos||'above'; return (G.gap||0)+(G.lw||0)+ (hasName&&pos!=='inline'? (G.offset||0)+th*1.5 : th*0.9); }
 function coverInfoText(cab,it){ const ci=P.cabinets.indexOf(cab)+1, ii=cab.items.indexOf(it)+1; return `${ORDER.number?ORDER.number+' - ':''}${P.name||''}${P.tag?' '+P.tag:''}${P.revision?' rev.'+P.revision:''} - Szafa ${ci} - Maskownica ${ii} - ${it.w}x${it.h} - ${it.row.mod} mod - ${new Date().toISOString().slice(0,10)}`; }
@@ -116,19 +117,19 @@ function coverGeometry(cab,it){
     if(L.divH){ let a=0; while(a<run.length){ if(tableCells(run[a].dev)){a++;continue;} let b=a; while(b+1<run.length && !tableCells(run[b+1].dev)) b++; polys.push(seg(run[a].x+(a===0?lwM:0), splitY, run[b].x+run[b].w-(b===run.length-1?lwM:0), splitY,'FRAME_DIV_H',lwH)); a=b+1; } }
     for(const lb of run){ const d=lb.dev; const symH=d.symH||L.symH, nameH=d.nameH||L.nameH, cellH=d.cellH||L.cellH||nameH; const tc=tableCells(d); const first=lb===run[0], last=lb===run[run.length-1];
       const ipos=d.icon? (d.iconPos||'left') : ''; const isc=(d.iconScale||L.iconScale||0.9);
-      const cellContent=(txt,k,bx,by,bw,bh)=>{ if(ipos==='cell'+(k+1)){ polys.push(...iconPolys(d.icon,bx+L.pad,by+L.pad,bw-2*L.pad,bh-2*L.pad,'ICON',isc)); return; } polys.push(...fitText(txt, cellH, bx,by,bw,bh, L.pad,'TEXT_NAME',L.font)); };
+      const cellContent=(txt,k,bx,by,bw,bh)=>{ if(ipos==='cell'+(k+1)){ polys.push(...iconPolys(d.icon,bx+L.pad,by+L.pad,bw-2*L.pad,bh-2*L.pad,'ICON',isc)); return; } polys.push(...fitText(txt, cellH, bx,by,bw,bh, L.pad,'TEXT_NAME',L.font,{tag:'cell:'+d.id+':'+k})); };
       if(tc){ const cells=(d.name||'').split('|'); const n=tc.n;
         if(tc.dir==='rows'){ const ch=L.h/n; for(let k=0;k<n;k++){ cellContent(cells[k]||'',k,lb.x,labTop+k*ch,lb.w,ch); if(k>0&&L.divH) polys.push(seg(lb.x+(first?lwM:0), labTop+k*ch, lb.x+lb.w-(last?lwM:0), labTop+k*ch,'FRAME_DIV_H',lwH)); } }
         else { const cw=lb.w/n; for(let k=0;k<n;k++){ cellContent(cells[k]||'',k,lb.x+k*cw,labTop,cw,L.h); if(k>0&&L.divV) polys.push(seg(lb.x+k*cw, labTop+lwM, lb.x+k*cw, labBottom-lwM,'FRAME_DIV_V',lwV)); } } }
       else { const upper=[lb.x,labTop,lb.w,splitY-labTop], lower=[lb.x,splitY,lb.w,labBottom-splitY]; const symBox=L.symTop?upper:lower; let nameBox=L.symTop?lower:upper;
-        if(d.symbol) polys.push(...fitText(d.symbol, symH, ...symBox, L.pad,'TEXT_SYMBOL',L.fontSym||L.font));
+        if(d.symbol) polys.push(...fitText(d.symbol, symH, ...symBox, L.pad,'TEXT_SYMBOL',L.fontSym||L.font,{tag:'symbol:'+d.id}));
         let nm=(d.name||'').replace(/\|/g,'/'); if(L.showRating&&d.rating) nm=(nm?nm+'/':'')+d.rating;
         if(ipos==='replace'){ polys.push(...iconPolys(d.icon,nameBox[0]+L.pad,nameBox[1]+L.pad,nameBox[2]-2*L.pad,nameBox[3]-2*L.pad,'ICON',isc)); }
         else { if(ipos==='left'||ipos==='right'){ const side=Math.min(nameBox[3], nameBox[2]*0.4); const ix= ipos==='left'? nameBox[0]+L.pad : nameBox[0]+nameBox[2]-side-L.pad; polys.push(...iconPolys(d.icon, ix, nameBox[1]+L.pad, side-L.pad, nameBox[3]-2*L.pad,'ICON',isc)); nameBox= ipos==='left'? [nameBox[0]+side, nameBox[1], nameBox[2]-side, nameBox[3]] : [nameBox[0], nameBox[1], nameBox[2]-side, nameBox[3]]; }
-          if(nm) polys.push(...fitText(nm, nameH, ...nameBox, L.pad,'TEXT_NAME',L.font)); } } }
+          if(nm) polys.push(...fitText(nm, nameH, ...nameBox, L.pad,'TEXT_NAME',L.font,{tag:'name:'+d.id})); } } }
     i=j+1; }
   for(const gi of groups){ const g=gi.grp; const lbs=gi.labels.filter(l=>!l.dev.blank); if(!lbs.length) continue; const xa=lbs[0].x, xb=lbs[lbs.length-1].x+lbs[lbs.length-1].w;
-    if(g.name) polys.push(...grpTextGeom(GT,g.name,xa,xb,labTop-(GT.gap||0),'top','GRP_TOP_TEXT','GRP_TOP_LINE'));
+    GT._gid=g.id; GB._gid=g.id; if(g.name) polys.push(...grpTextGeom(GT,g.name,xa,xb,labTop-(GT.gap||0),'top','GRP_TOP_TEXT','GRP_TOP_LINE'));
     if(g.bot) polys.push(...grpTextGeom(GB,g.bot,xa,xb,nicheTop+r.nicheH+(GB.gap||0),'bot','GRP_BOT_TEXT','GRP_BOT_LINE')); }
   if(P.info&&P.info.on){ const ih=P.info.h||3; polys.push(...fitText(coverInfoText(cab,it), ih, box.x+3, box.y+2, box.w-6, ih*1.6, 0,'INFO',L.fontInfo||L.font,{raw:true,align:'left'})); }
   const Q=P.qr||{pos:0}; if(Q.pos>0){ const sz=Q.size||15; const qx= (Q.pos===2)? box.x+3 : box.x+box.w-3-sz; const qy= (Q.pos===1)? box.y+3 : box.y+box.h-3-sz; polys.push(...qrPolys(coverInfoText(cab,it), qx, qy, sz, 'QR')); }
@@ -218,10 +219,12 @@ function applyViewBox(){ const v=currentViewBox(); const svg=$('svg'); if(svg) s
 function svgFrame(polys, on){ let s=''; const pairs={}; for(const p of polys){ if(!on.has(p.layer)) continue; if(p.pair){ (pairs[p.pair]=pairs[p.pair]||[]).push(p); continue; } if(p.layer==='QR') { s+=`<path d="${pathD(p)}" fill="var(--ink)"/>`; continue; }
     if(p.band) s+=`<path d="${pathD(p)}" fill="var(--ink)" stroke="none"/>`; else s+=`<path d="${pathD(p)}" fill="none" stroke="var(--ink)" stroke-width=".3"/>`; }
   for(const k in pairs) s+=`<path d="${pairs[k].map(pathD).join(' ')}" fill="var(--ink)" fill-rule="evenodd" stroke="none"/>`; return s; }
-function svgText(polys, on){ let s=''; const fill={}; for(const p of polys){ if(!on.has(p.layer)) continue; if(p.closed&&p.outline){ (fill[p.layer]=fill[p.layer]||[]).push(pathD(p)); continue; } s+=`<path d="${pathD(p)}" fill="none" stroke="var(--ink)" stroke-width="0.3" stroke-linecap="round" stroke-linejoin="round"/>`; }
-  for(const k in fill) s+=`<path d="${fill[k].join(' ')}" fill="var(--ink)" fill-rule="evenodd" stroke="none"/>`; return s; }
-function render(){
-  renumber(); scheduleSave();
+function svgText(polys, on){ let s=''; const fill={}; for(const p of polys){ if(!on.has(p.layer)) continue; const key=p.layer+(p.shrunk?'!':''); if(p.closed&&p.outline){ (fill[key]=fill[key]||[]).push(pathD(p)); continue; } s+=`<path d="${pathD(p)}" fill="none" stroke="${p.shrunk?'var(--danger)':'var(--ink)'}" stroke-width="0.3" stroke-linecap="round" stroke-linejoin="round"/>`; }
+  for(const k in fill) s+=`<path d="${fill[k].join(' ')}" fill="${k.endsWith('!')?'var(--danger)':'var(--ink)'}" fill-rule="evenodd" stroke="none"/>`; return s; }
+let FITMAP=new Map();
+function render(){ renderCanvas(); renderCrumb(); renderCabs(); renderItems(); renderGroups(); renderEditor(); renderPalette(); renderMulti(); renderTplList(); renderTable(); }
+function renderCanvas(){
+  renumber(); scheduleSave(); FIT_LOG=[];
   const v=currentViewBox(); const W=totalW(); const tall = BASE.h<BASE.w;
   let s=`<svg xmlns="${NS}" viewBox="${v.x} ${v.y} ${v.w} ${v.h}" id="svg"${tall?' style="max-height:none;width:100%"':''}>`;
   s+=`<defs><pattern id="hatch" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" stroke="var(--cover-edge)" stroke-width=".5"/></pattern></defs>`;
@@ -264,7 +267,7 @@ function render(){
     s+=`</g>`; });
   s+=`<g id="ghost"></g></svg>`;
   $('canvas').innerHTML=s; $('stats').textContent=`${P.cabinets.length} szaf · ${coverItems().length} maskownic · ${nDev} aparatów · ${Math.round(ZOOM.k*100)}%`;
-  renderCrumb(); renderCabs(); renderItems(); renderGroups(); renderEditor(); renderPalette(); renderMulti();
+  FITMAP=new Map(); for(const x of FIT_LOG) if(x.tag){ const prev=FITMAP.get(x.tag); if(!prev||x.k<prev.k) FITMAP.set(x.tag,x); } FIT_LOG=null;
 }
 function renderCrumb(){ $('crumb').innerHTML=`<span>${esc(ORDER.number||'(bez numeru)')}${ORDER.client?' · '+esc(ORDER.client):''}</span><span>›</span><b>${esc(P.name)}${P.tag?' '+esc(P.tag):''}</b>`; }
 function renderCabs(){ $('cabs').innerHTML=P.cabinets.map((c,i)=>`<div class="it${c===selCab?' on':''}" data-cab="${c.id}"><span class="grow"><b>Szafa ${i+1}</b> · ${c.w}×${c.h}${c.plinth?' +'+c.plinth:''} · ${c.items.length} el.</span><button class="small ghost icon" data-act="left" title="W lewo">◀</button><button class="small ghost icon" data-act="right" title="W prawo">▶</button><button class="small ghost icon" data-act="dup" title="Duplikuj">⧉</button><button class="small danger icon" data-act="del">×</button></div>`).join('')||'<div class="it">Brak szaf</div>';
@@ -277,15 +280,15 @@ function renderItems(){ const c=selCab; if(!c){ $('items').innerHTML='<div class
     <label class="f">Szerokość mm<input type="number" data-if="w" value="${it.w}" step="10"></label><label class="f">Wysokość mm<input type="number" data-if="h" value="${it.h}" step="10"></label></div>`;
   if(it.type==='cover'){ const pos=it.row.pos||'block'; h+=`<div class="row four"><label class="f">Moduły<input type="number" data-if="mod" value="${it.row.mod}" step="1" min="1"></label><label class="f">Wys. wycięcia mm<input type="number" data-if="nicheH" value="${it.row.nicheH}" step="1"></label>
     <label class="f">Położenie w pionie<select data-if="pos"><option value="block" ${pos==='block'?'selected':''}>Blok na środku</option><option value="niche" ${pos==='niche'?'selected':''}>Wycięcie na środku</option><option value="top" ${pos==='top'?'selected':''}>Od góry (mm)</option></select></label>
-    <label class="f">Wycięcie od góry mm<input type="number" data-if="nicheY" value="${it.row.nicheY==null?'':it.row.nicheY}" step="1" ${pos!=='top'?'disabled':''}></label></div>`; }
-  $('itemEdit').innerHTML=h; }
+    <label class="f">Wycięcie od góry mm<input type="number" data-if="nicheY" value="${it.row.nicheY==null?'':it.row.nicheY}" step="1" ${pos!=='top'?'disabled':''}></label></div><div class="btns"><button class="small" id="btnItemTable">Tabela opisów</button><button class="small ghost" id="btnItemTpl">Zapisz maskownicę jako wzorzec</button></div>`; }
+  $('itemEdit').innerHTML=h; const bt=$('btnItemTable'); if(bt) bt.onclick=()=>{ TABLE_ON=true; if(VIEW!=='item'){ VIEW='item'; document.querySelectorAll('#view button').forEach(x=>x.classList.toggle('on',x.dataset.v===VIEW)); ZOOM.key=''; } render(); }; const bp=$('btnItemTpl'); if(bp) bp.onclick=()=>saveCoverTemplate(it); }
 function renderGroups(){ const it=selItem&&selItem.type==='cover'?selItem:null; const box=$('groups'); if(!it){ box.innerHTML='<div class="it" style="cursor:default;color:var(--ink-2)">Zaznacz maskownicę z wycięciem</div>'; $('grpEdit').innerHTML=''; return; }
   const gx=groupX(it.row);
   box.innerHTML=it.row.groups.map((g,i)=>`<div class="it${g===selGrp?' on':''}" data-grp="${g.id}"><span class="grow"><span class="tag">${i+1}</span> ${esc(g.name||'(bez nazwy)')}${g.bot?' / '+esc(g.bot):''} · ${g.devices.length} ap. · ${ALIGN_NAMES[g.align]}${g.align==='free'?' od '+gx.get(g.id):''}</span><button class="small ghost icon" data-act="up">▲</button><button class="small ghost icon" data-act="down">▼</button><button class="small danger icon" data-act="del">×</button></div>`).join('')||'<div class="it" style="cursor:default;color:var(--ink-2)">Brak grup – dodaj grupę, potem aparaty</div>';
   const g=selGrp&&it.row.groups.includes(selGrp)?selGrp:null; if(!g){ $('grpEdit').innerHTML=''; return; }
   $('grpEdit').innerHTML=`<div class="row" style="margin-top:8px"><label class="f">Podpis górny (pusty = bez linii)<input data-gf="name" value="${esc(g.name)}"></label><label class="f">Podpis dolny<input data-gf="bot" value="${esc(g.bot||'')}"></label></div>
     <div class="row"><label class="f">Położenie<select data-gf="align"><option value="left" ${g.align==='left'?'selected':''}>Do lewej krawędzi</option><option value="right" ${g.align==='right'?'selected':''}>Do prawej krawędzi</option><option value="free" ${g.align==='free'?'selected':''}>Swobodne</option></select></label><label class="f">Moduł od lewej<input type="number" data-gf="x" value="${gx.get(g.id)}" step="1" min="0" ${g.align!=='free'?'disabled':''}></label></div>
-    <div class="btns"><button class="small" data-gact="toLeft">⇤ Do lewej</button><button class="small" data-gact="toRight">⇥ Do prawej</button><button class="small" data-gact="dup">Duplikuj grupę</button></div>`; }
+    <div class="btns"><button class="small" data-gact="toLeft">⇤ Do lewej</button><button class="small" data-gact="toRight">⇥ Do prawej</button><button class="small" data-gact="dup">Duplikuj grupę</button><button class="small ghost" data-gact="tpl">Zapisz jako wzorzec</button></div>`; }
 function renderPalette(){ $('pal').innerHTML=DB.map((d,i)=>`<button data-db="${i}"><b>${esc(d.code)}</b><span>${esc(d.name||'—')}</span><i>${d.mod} mod${d.prefix?' · '+esc(d.prefix):''}${d.rating?' · '+esc(d.rating):''}${(d.table||'std')!=='std'?' · '+d.table.slice(1)+' pola':''}</i></button>`).join('');
   const it=selItem&&selItem.type==='cover'?selItem:null; const fi=it&&findItem(it.id); const g=selGrp&&it&&it.row.groups.includes(selGrp)?selGrp:null;
   $('devTarget').textContent= it? `Cel: szafa ${P.cabinets.indexOf(fi.cab)+1}, element ${fi.cab.items.indexOf(it)+1} (${it.w}×${it.h}, ${it.row.mod} mod)` + (g? `, grupa „${g.name||'bez nazwy'}”` : (it.row.groups.length? ', ostatnia grupa' : ' – powstanie grupa do lewej')) : 'Zaznacz maskownicę z wycięciem (zakładka Rozdzielnica lub klik na rysunku).'; }
@@ -318,7 +321,7 @@ async function saveLibrary(){ await IDB.set('devices', DB); await IDB.set('enclo
 async function listOrders(){ const keys=await IDB.keys('order:'); const out=[]; for(const k of keys){ const o=await IDB.get(k); if(o) out.push(o); } return out.sort((a,b)=>(b.updated||0)-(a.updated||0)); }
 async function listBoards(orderId){ const keys=await IDB.keys('board:'); const out=[]; for(const k of keys){ const b=await IDB.get(k); if(b&&b.orderId===orderId) out.push(b); } return out.sort((a,b)=>(b.updated||0)-(a.updated||0)); }
 async function openBoard(board, order){ await saveNow(); ORDER=order; loadBoard(board); toast(`Otwarto: ${P.name}`); }
-function loadBoard(b){ P=migrateBoard(b); selCab=P.cabinets[0]||null; selItem=null; selGrp=null; selDev=null; multi.clear(); history.length=0; future.length=0; ZOOM.key=''; syncInputs(); render(); }
+function loadBoard(b){ P=migrateBoard(b); selCab=P.cabinets[0]||null; selItem=null; selGrp=null; selDev=null; multi.clear(); history.length=0; future.length=0; ZOOM.key=''; TABLE_SIG=''; syncInputs(); render(); }
 function migrateBoard(b){ if(b.rows&&!b.cabinets){ const c=newCab(); c.w=(b.front&&b.front.w)||600; c.h=(b.front&&b.front.h)||800; const L=Object.assign(defaultLabel(),b.label||{}); let y=0;
     for(const r of b.rows){ const top=r.y-L.h-L.gap-20; if(top>y) c.items.push({id:uid(),type:'empty',w:c.w,h:Math.round(top-y)}); const h=Math.round(L.h+L.gap+20+r.nicheH+20); c.items.push({id:uid(),type:'cover',w:c.w,h,row:{mod:r.mod,nicheH:r.nicheH,nicheY:null,pos:'block',devices:r.devices||[]}}); y=Math.max(y,top)+h; }
     b={name:b.name,pitch:b.pitch,label:L,cabinets:[c]}; }
@@ -353,8 +356,8 @@ async function driveSync(quiet){ if(!gToken){ if(!quiet) gMsg('Najpierw zaloguj.
       if(rupd>upd){ const data=await driveGet(rf.id); if(data&&data.order){ await IDB.set('order:'+data.order.id,data.order); for(const b of (data.boards||[])){ b.orderId=data.order.id; await IDB.set('board:'+b.id,b); } down++; if(data.order.id===ORDER.id){ ORDER=data.order; const cur=(data.boards||[]).find(b=>b.id===P.id); if(cur) loadBoard(cur); } } } }
     // library
     const lib=byName['library.json']; const libLocal=SETTINGS.libUpdated||0; const libRemote=lib? +(lib.appProperties&&lib.appProperties.updated||0):0;
-    if(!lib||libLocal>libRemote){ await drivePut('library.json',{format:FORMAT,devices:DB,enclosures:ENC,fonts:USERFONTS,icons:USERICONS}, lib&&lib.id, libLocal||Date.now()); }
-    else if(libRemote>libLocal){ const d=await driveGet(lib.id); if(d&&d.devices){ DB=d.devices; ENC=d.enclosures||ENC; USERFONTS=d.fonts||USERFONTS; USERICONS=d.icons||USERICONS; SETTINGS.libUpdated=libRemote; await IDB.set('devices',DB); await IDB.set('enclosures',ENC); await IDB.set('fonts',USERFONTS); await IDB.set('icons',USERICONS); renderPalette(); refreshFontSelects(); } }
+    if(!lib||libLocal>libRemote){ await drivePut('library.json',{format:FORMAT,devices:DB,enclosures:ENC,fonts:USERFONTS,icons:USERICONS,templates:TEMPLATES}, lib&&lib.id, libLocal||Date.now()); }
+    else if(libRemote>libLocal){ const d=await driveGet(lib.id); if(d&&d.devices){ DB=d.devices; ENC=d.enclosures||ENC; USERFONTS=d.fonts||USERFONTS; USERICONS=d.icons||USERICONS; TEMPLATES=d.templates||TEMPLATES; await IDB.set('templates',TEMPLATES); renderTplList(); SETTINGS.libUpdated=libRemote; await IDB.set('devices',DB); await IDB.set('enclosures',ENC); await IDB.set('fonts',USERFONTS); await IDB.set('icons',USERICONS); renderPalette(); refreshFontSelects(); } }
     await IDB.set('settings',SETTINGS); gMsg(`Synchronizacja OK: wysłano ${up}, pobrano ${down} zleceń · ${new Date().toLocaleTimeString('pl-PL')}`,'ok'); if(!quiet) toast('Synchronizacja zakończona');
   }catch(e){ gMsg('Błąd synchronizacji: '+e.message,'err'); } }
 
@@ -371,6 +374,86 @@ async function saveFile(name, data, mime){
 function showDl(t,err){ const e=$('dlMsg'); e.style.display='block'; e.textContent=t; e.className='msg'+(err?' err':''); }
 function toast(t){ const e=$('toast'); e.textContent=t; e.classList.add('on'); clearTimeout(e._t); e._t=setTimeout(()=>e.classList.remove('on'),2600); }
 function readFile(input, cb){ const file=input.files[0]; if(!file) return; const rd=new FileReader(); rd.onload=()=>{ try{ cb(rd.result, file); }catch(err){ toast('Błąd: '+err.message); } input.value=''; }; rd.readAsText(file,'UTF-8'); }
+
+/* ===================== Label table (horizontal) ===================== */
+let TABLE_ON=false, TABLE_SIG='', tblRange=null, tblAnchor=null, focusSnap=null;
+function tableCols(it){ const cab=findItem(it.id).cab; const g=coverGeometry(cab,it); return {cab,g,cols:g.labels.slice().sort((a,b)=>a.x-b.x)}; }
+function tblFieldRows(){ return ['symbol','name','rating']; }
+function renderTable(){ const wrap=$('tableWrap'); const it=selItem&&selItem.type==='cover'?selItem:null; $('stage').classList.toggle('tbl',TABLE_ON&&!!it); if(!TABLE_ON||!it){ wrap.style.display='none'; TABLE_SIG=''; return; } wrap.style.display='block';
+  const {cab,g,cols}=tableCols(it); const sig=it.id+'|'+cols.map(l=>l.dev.id+':'+(l.dev.table||'std')+':'+(l.dev.blank?1:0)).join(',')+'|'+it.row.groups.map(x=>x.id+':'+x.devices.length).join(',');
+  if(sig!==TABLE_SIG){ TABLE_SIG=sig; buildTable(cab,it,cols); }
+  updateTableState(cols); }
+function buildTable(cab,it,cols){ const wrap=$('tableWrap'); const ci=P.cabinets.indexOf(cab)+1, ii=cab.items.indexOf(it)+1; const used=rowDevices(it.row).reduce((a,d)=>a+d.mod,0); const free=it.row.mod-used;
+  const icons=[...ICONS,...USERICONS]; const W=120;
+  let h=`<div class="tb"><b>Tabela opisów</b><span style="font-size:12px;color:var(--ink-2)">szafa ${ci} · maskownica ${ii} · ${it.row.mod} mod</span><span style="flex:1"></span>
+    <button class="small ghost" data-ta="prev">◀ Poprzednia</button><button class="small ghost" data-ta="next">Następna ▶</button><button class="small ghost" data-ta="csvout">Eksport rzędu</button><button class="small ghost" data-ta="csvin">Import rzędu</button><button class="small ghost" data-ta="csvnames">Importuj tylko opisy</button><button class="small ghost icon" data-ta="close" title="Zamknij">×</button>
+    <input type="file" id="rowCsvFile" accept=".csv,.txt,.tsv" style="display:none"></div>
+    <div style="overflow:auto"><table><colgroup><col style="width:96px">${cols.map(()=>`<col style="width:${W}px">`).join('')}<col style="width:90px"></colgroup>`;
+  h+=`<tr><th class="lab">Poz. · kod</th>${cols.map((l,i)=>`<th class="dev" data-d="${l.dev.id}" title="Zaznacz aparat">${i+1} · ${esc(l.dev.code)}${l.dev.blank?' (zaślepka)':''}${tableCells(l.dev)?' · '+tableCells(l.dev).n+' pola':''}</th>`).join('')}<th style="color:${free<0?'var(--danger)':'var(--ink-2)'}">${free<0?'za dużo o '+(-free):'wolne '+free} mod</th></tr>`;
+  const cell=(l,i,f,idx)=>{ const d=l.dev; if(d.blank) return `<td class="blank" data-d="${d.id}">—</td>`; if(f==='symbol'){ if(tableCells(d)) return `<td class="blank" data-d="${d.id}" title="Tabelka wielopolowa – bez symbolu">bez symbolu</td>`; return `<td data-d="${d.id}"><input data-d="${d.id}" data-f="symbol" data-r="0" data-c="${i}" value="${esc(d.symbol)}" placeholder="auto"></td>`; }
+    if(f==='name'){ const tc=tableCells(d); if(!tc) return `<td data-d="${d.id}"><input data-d="${d.id}" data-f="name" data-r="1" data-c="${i}" value="${esc(d.name)}" placeholder="nazwa"></td>`; const cells=(d.name||'').split('|'); return `<td data-d="${d.id}"><div class="stack">${Array.from({length:tc.n},(_,k)=>`<input data-d="${d.id}" data-f="cell:${k}" data-r="1" data-c="${i}" data-k="${k}" value="${esc(cells[k]||'')}" placeholder="pole ${k+1}">`).join('')}</div></td>`; }
+    if(f==='rating') return `<td data-d="${d.id}"><input data-d="${d.id}" data-f="rating" data-r="2" data-c="${i}" value="${esc(d.rating||'')}" placeholder="model" list="ratings"></td>`;
+    if(f==='icon') return `<td data-d="${d.id}"><select data-d="${d.id}" data-f="icon"><option value="">– ikona –</option>${icons.map(x=>`<option value="${x.id}" ${d.icon===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></td>`; };
+  h+=`<tr><th class="lab">Symbol</th>${cols.map((l,i)=>cell(l,i,'symbol')).join('')}<td rowspan="5" style="background:var(--panel)"></td></tr>`;
+  h+=`<tr><th class="lab">Nazwa / pola</th>${cols.map((l,i)=>cell(l,i,'name')).join('')}</tr>`;
+  h+=`<tr><th class="lab">Model</th>${cols.map((l,i)=>cell(l,i,'rating')).join('')}</tr>`;
+  // group row: consecutive columns of same group merged
+  let gcells=''; let i=0; while(i<cols.length){ const gr=cols[i].grp; let j=i; while(j+1<cols.length&&cols[j+1].grp===gr) j++; gcells+=`<td colspan="${j-i+1}" data-g="${gr.id}"><div class="pair"><input data-g="${gr.id}" data-f="gname" value="${esc(gr.name)}" placeholder="podpis górny"><input data-g="${gr.id}" data-f="gbot" value="${esc(gr.bot||'')}" placeholder="podpis dolny"></div></td>`; i=j+1; }
+  h+=`<tr><th class="lab">Grupa</th>${gcells}</tr>`;
+  h+=`<tr><th class="lab">Ikona</th>${cols.map((l,i)=>cell(l,i,'icon')).join('')}</tr>`;
+  h+=`</table></div><div style="padding:4px 8px;font-size:11px;color:var(--ink-2)">Tab / Enter – następny aparat, ↓ ↑ – wiersz niżej/wyżej, Ctrl+V – wklej blok z arkusza (w prawo), Shift+klik – zaznacz zakres, Ctrl+C – kopiuj zakres</div>`;
+  wrap.innerHTML=h; }
+function updateTableState(cols){ const wrap=$('tableWrap'); wrap.querySelectorAll('th.dev').forEach(th=>th.classList.toggle('sel', !!(selDev&&th.dataset.d===selDev.id)));
+  wrap.querySelectorAll('td[data-d]').forEach(td=>td.classList.toggle('sel', !!(selDev&&td.dataset.d===selDev.id)));
+  wrap.querySelectorAll('input[data-f]').forEach(inp=>{ const d=inp.dataset.d, f=inp.dataset.f; let tag=null; if(f==='symbol') tag='symbol:'+d; else if(f==='name') tag='name:'+d; else if(f.startsWith('cell:')) tag='cell:'+d+':'+inp.dataset.k; else if(f==='gname') tag='grp:name:'+inp.dataset.g; else if(f==='gbot') tag='grp:bot:'+inp.dataset.g;
+    const x=tag&&FITMAP.get(tag); if(x){ inp.classList.add('bad'); inp.title=`Nie mieści się: zmniejszony do ${Math.round(x.k*100)}% (${(x.capH*x.k).toFixed(1)} mm)`; } else { inp.classList.remove('bad'); inp.title=''; } }); }
+function tblApply(inp, val, silent){ const f=inp.dataset.f; if(inp.dataset.g){ const fg=findGrp(inp.dataset.g); if(!fg) return; if(f==='gname') fg.grp.name=val; else fg.grp.bot=val; }
+  else { const fd=findDev(inp.dataset.d); if(!fd) return; const d=fd.dev; if(f==='symbol'){ if(val.trim()===''){ d.auto=true; } else { d.symbol=val.trim(); d.auto=false; } } else if(f==='name') d.name=val; else if(f==='rating') d.rating=val.trim(); else if(f==='icon'){ d.icon=val; if(val&&!d.iconPos) d.iconPos='left'; } else if(f.startsWith('cell:')){ const tc=tableCells(d); const n=tc?tc.n:1; const cells=(d.name||'').split('|'); while(cells.length<n) cells.push(''); cells.length=n; cells[+inp.dataset.k]=val; d.name=cells.join('|'); } }
+  P.updated=Date.now(); if(!silent){ renderCanvas(); const it=selItem; if(it){ const {cols}=tableCols(it); updateTableState(cols); } } }
+function tblInputAt(r,c){ return $('tableWrap').querySelector(`input[data-r="${r}"][data-c="${c}"]`); }
+$('tableWrap').addEventListener('focusin',e=>{ const inp=e.target; if(!inp.matches('input,select')) return; focusSnap=JSON.stringify(P); if(inp.dataset.d&&!(inp.dataset.f||'').startsWith('g')){ const fd=findDev(inp.dataset.d); if(fd&&selDev!==fd.dev){ selDev=fd.dev; selGrp=fd.grp; multi.clear(); renderCanvas(); updateTableState(tableCols(selItem).cols); renderEditor(); } } if(inp.matches('input')&&!tblRange) tblAnchor=inp; });
+$('tableWrap').addEventListener('input',e=>{ const inp=e.target; if(!inp.matches('input[data-f]')) return; tblApply(inp, inp.value); });
+$('tableWrap').addEventListener('change',e=>{ const inp=e.target; if(!inp.matches('input[data-f],select[data-f]')) return; if(inp.matches('select')) tblApply(inp, inp.value); if(focusSnap&&focusSnap!==JSON.stringify(P)){ history.push(focusSnap); future.length=0; focusSnap=JSON.stringify(P); } if(inp.dataset.f==='symbol'){ renderCanvas(); inp.value=findDev(inp.dataset.d).dev.symbol; } renderEditor(); renderGroups(); });
+$('tableWrap').addEventListener('click',e=>{ const b=e.target.closest('button[data-ta]'); if(b){ tblAction(b.dataset.ta); return; } const th=e.target.closest('th.dev'); if(th){ const fd=findDev(th.dataset.d); if(fd){ selDev=fd.dev; selGrp=fd.grp; multi.clear(); renderCanvas(); updateTableState(tableCols(selItem).cols); renderEditor(); } return; }
+  const inp=e.target.closest('input[data-r]'); if(inp&&e.shiftKey&&tblAnchor&&tblAnchor.dataset.r!=null){ e.preventDefault(); const r1=Math.min(+tblAnchor.dataset.r,+inp.dataset.r), r2=Math.max(+tblAnchor.dataset.r,+inp.dataset.r), c1=Math.min(+tblAnchor.dataset.c,+inp.dataset.c), c2=Math.max(+tblAnchor.dataset.c,+inp.dataset.c); tblRange={r1,r2,c1,c2}; $('tableWrap').querySelectorAll('input.rng').forEach(x=>x.classList.remove('rng')); $('tableWrap').querySelectorAll('input[data-r]').forEach(x=>{ const r=+x.dataset.r,c=+x.dataset.c; if(r>=r1&&r<=r2&&c>=c1&&c<=c2) x.classList.add('rng'); }); }
+  else if(inp){ tblRange=null; $('tableWrap').querySelectorAll('input.rng').forEach(x=>x.classList.remove('rng')); tblAnchor=inp; } });
+$('tableWrap').addEventListener('keydown',e=>{ const inp=e.target; if(!inp.matches('input[data-r]')) return; const r=+inp.dataset.r, c=+inp.dataset.c;
+  if(e.key==='Enter'){ e.preventDefault(); let n=null, cc=c; while(!n&&cc<200){ cc++; n=tblInputAt(r,cc); } if(n){ n.focus(); n.select(); } }
+  else if(e.key==='ArrowDown'||e.key==='ArrowUp'){ const dr=e.key==='ArrowDown'?1:-1; let n=null; if(inp.dataset.k!=null){ const sib=inp.parentElement.querySelectorAll('input'); const k=+inp.dataset.k; if(sib[k+dr]) n=sib[k+dr]; } if(!n){ let rr=r; while(!n&&rr+dr>=0&&rr+dr<=2){ rr+=dr; n=tblInputAt(rr,c); } } if(n){ e.preventDefault(); n.focus(); n.select(); } }
+  else if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='c'&&tblRange){ e.preventDefault(); const rows=[]; for(let rr=tblRange.r1;rr<=tblRange.r2;rr++){ const cells=[]; for(let cc=tblRange.c1;cc<=tblRange.c2;cc++){ const x=tblInputAt(rr,cc); const td=x&&x.closest('td'); cells.push(td? [...td.querySelectorAll('input')].map(y=>y.value).join('|') : ''); } rows.push(cells.join('\t')); } navigator.clipboard.writeText(rows.join('\n')).then(()=>toast('Skopiowano '+rows.length+' × '+(tblRange.c2-tblRange.c1+1)+' komórek')); } });
+$('tableWrap').addEventListener('paste',e=>{ const inp=e.target; if(!inp.matches('input[data-r]')) return; const txt=(e.clipboardData||window.clipboardData).getData('text'); if(!txt||(!txt.includes('\t')&&!txt.includes('\n'))) return; e.preventDefault();
+  let lines=txt.replace(/\r/g,'').split('\n'); if(lines.length&&lines[lines.length-1]==='') lines.pop(); let grid=lines.map(l=>l.split('\t')); if(grid.every(g=>g.length===1)) grid=[grid.map(g=>g[0])];
+  snapshot(); const r0=+inp.dataset.r, c0=+inp.dataset.c; let n=0;
+  grid.forEach((row,i)=>{ const rr=r0+i; if(rr>2) return; row.forEach((val,j)=>{ const cc=c0+j; const x=tblInputAt(rr,cc); if(!x) return; const td=x.closest('td'); const ins=[...td.querySelectorAll('input')]; if(ins.length>1&&val.includes('|')){ val.split('|').forEach((v,k)=>{ if(ins[k]){ ins[k].value=v.trim(); tblApply(ins[k],v.trim(),true); } }); } else { x.value=val.trim(); tblApply(x,val.trim(),true); } n++; }); });
+  renderCanvas(); updateTableState(tableCols(selItem).cols); renderEditor(); renderGroups(); toast(`Wklejono ${n} komórek`); });
+function tblAction(a){ const it=selItem; const cab=findItem(it.id).cab;
+  if(a==='close'){ TABLE_ON=false; renderTable(); return; }
+  if(a==='prev'||a==='next'){ const list=coverItems(); const i=list.findIndex(x=>x.item===it); const t=list[i+(a==='next'?1:-1)]; if(!t){ toast('Brak kolejnej maskownicy'); return; } selItem=t.item; selCab=t.cab; selDev=null; selGrp=null; ZOOM.key=''; render(); return; }
+  if(a==='csvout'){ saveFile(`${fname(P.tag||P.name)}_szafa${P.cabinets.indexOf(cab)+1}_maskownica${cab.items.indexOf(it)+1}.csv`, '\uFEFF'+exportCsv(it)); return; }
+  if(a==='csvin'||a==='csvnames'){ const f=$('rowCsvFile'); f.onchange=()=>readFile(f,txt=>{ const parsed=parseCsv(txt); const src=parsed.cabinets.flatMap(c=>c.items).find(x=>x.type==='cover'); if(!src) throw new Error('w pliku nie ma wiersza MASKOWNICA');
+      snapshot(); if(a==='csvin'){ const mode=confirm('OK = zastąp zawartość maskownicy, Anuluj = dopisz grupy'); const groups=src.row.groups.map(g=>{ g.devices=g.devices.map(d=>csvDevToDev(d)); return g; }); if(mode) it.row.groups=groups; else it.row.groups.push(...groups); }
+      else { const incoming=src.row.groups.flatMap(g=>g.devices).filter(d=>{ const b=DB.find(x=>norm(x.code)===norm(d.code)); return !(b&&b.blank); }); const targets=tableCols(it).cols.map(l=>l.dev).filter(d=>!d.blank); let n=0; targets.forEach((d,i)=>{ const s=incoming[i]; if(!s) return; if(s.name) d.name=s.name; if(s.rating) d.rating=s.rating; if(s.symbol){ d.symbol=s.symbol; d.auto=false; } if(s.icon&&iconById(s.icon)){ d.icon=s.icon; d.iconPos=s.iconPos||'left'; } n++; }); toast(`Nadpisano opisy ${n} aparatów`); }
+      selDev=null; selGrp=null; TABLE_SIG=''; render(); }); f.click(); } }
+function csvDevToDev(d){ let b=DB.find(x=>norm(x.code)===norm(d.code)); if(!b){ b={code:d.code,name:'',mod:d.modCsv||1,prefix:'F',table:d.tableCsv||'std',rating:''}; DB.push(b); saveLibrary(); } return {id:uid(),code:b.code,name:b.blank?'':d.name,mod:d.modCsv||b.mod,prefix:b.prefix,blank:!!b.blank,auto:d.auto,symbol:d.symbol,table:d.tableCsv||b.table||'std',rating:d.rating||b.rating||'',symH:d.symH,nameH:d.nameH,icon:d.icon&&iconById(d.icon)?d.icon:'',iconPos:d.iconPos||'left'}; }
+$('btnTable').onclick=()=>{ if(!selItem||selItem.type!=='cover'){ const ci=coverItems()[0]; if(!ci){ toast('Dodaj maskownicę z wycięciem'); return; } selItem=ci.item; selCab=ci.cab; } TABLE_ON=!TABLE_ON; if(TABLE_ON&&VIEW!=='item'){ VIEW='item'; document.querySelectorAll('#view button').forEach(x=>x.classList.toggle('on',x.dataset.v===VIEW)); ZOOM.key=''; } render(); };
+
+/* ===================== Templates (wzorce) ===================== */
+let TEMPLATES=[];
+async function saveTemplates(){ await IDB.set('templates',TEMPLATES); SETTINGS.libUpdated=Date.now(); await IDB.set('settings',SETTINGS); if(SETTINGS.gAuto&&gToken) driveSyncDebounced(); }
+function tplMod(t){ return t.kind==='group'? groupMod(t.data) : rowDevices(t.data.row).reduce((a,d)=>a+d.mod,0); }
+function renderTplList(){ const el=$('tplList'); if(!el) return; el.innerHTML=TEMPLATES.map(t=>`<div class="it" style="cursor:default"><span class="grow"><b>${esc(t.name)}</b> <span class="tag">${t.kind==='group'?'grupa':'maskownica'}</span> · ${tplMod(t)} mod${t.kind==='group'?' · '+t.data.devices.length+' ap.':''}</span>${t.kind==='group'?`<button class="small" data-tpl="${t.id}" data-al="left" title="Wstaw do lewej">⇤</button><button class="small" data-tpl="${t.id}" data-al="right" title="Wstaw do prawej">⇥</button>`:`<button class="small" data-tpl="${t.id}" data-al="cover">Wstaw</button>`}</div>`).join('')||'<div class="it" style="cursor:default;color:var(--ink-2)">Brak wzorców</div>'; }
+$('tplList').addEventListener('click',e=>{ const b=e.target.closest('button[data-tpl]'); if(!b) return; const t=TEMPLATES.find(x=>x.id===b.dataset.tpl); if(!t) return; snapshot();
+  if(t.kind==='group'){ const it=selItem&&selItem.type==='cover'?selItem:null; if(!it){ toast('Zaznacz maskownicę z wycięciem'); history.pop(); return; } const g=reidKeep(JSON.parse(JSON.stringify(t.data)),t.keepSymbols); g.align=b.dataset.al; if(g.align==='left'){ const li=it.row.groups.filter(x=>x.align==='left').length; it.row.groups.splice(li,0,g); } else it.row.groups.push(g); selGrp=g; selDev=null; toast(`Wstawiono grupę „${t.name}”`); }
+  else { if(!selCab){ toast('Zaznacz szafę'); history.pop(); return; } const it=reidKeep(JSON.parse(JSON.stringify(t.data)),t.keepSymbols); it.type='cover'; const i=selItem? selCab.items.indexOf(selItem)+1 : selCab.items.length; selCab.items.splice(i,0,it); selItem=it; selGrp=null; selDev=null; toast(`Wstawiono maskownicę „${t.name}”`); }
+  TABLE_SIG=''; change(); });
+function reidKeep(obj, keep){ if(Array.isArray(obj)) obj.forEach(o=>reidKeep(o,keep)); else if(obj&&typeof obj==='object'){ if(obj.id) obj.id=uid(); if(!keep&&obj.auto!==false&&obj.symbol!=null&&obj.code) obj.symbol=''; for(const k in obj) reidKeep(obj[k],keep); } return obj; }
+function saveGroupTemplate(g){ const name=prompt('Nazwa wzorca grupy', g.name||''); if(!name) return; const keep=confirm('Zachować symbole na stałe (OK), czy numerować na nowo po wstawieniu (Anuluj)?'); TEMPLATES.push({id:uid(),name:name.trim(),kind:'group',keepSymbols:keep,data:JSON.parse(JSON.stringify(g)),created:Date.now()}); saveTemplates(); renderTplList(); toast('Zapisano wzorzec'); }
+function saveCoverTemplate(it){ const name=prompt('Nazwa wzorca maskownicy',''); if(!name) return; const keep=confirm('Zachować symbole na stałe (OK), czy numerować na nowo po wstawieniu (Anuluj)?'); TEMPLATES.push({id:uid(),name:name.trim(),kind:'cover',keepSymbols:keep,data:JSON.parse(JSON.stringify({type:'cover',w:it.w,h:it.h,row:it.row})),created:Date.now()}); saveTemplates(); renderTplList(); toast('Zapisano wzorzec'); }
+function renderTpl(){ $('tplt').innerHTML=`<tr><th>Nazwa</th><th>Rodzaj</th><th>Zawartość</th><th>Symbole</th><th></th></tr>`+TEMPLATES.map((t,i)=>{ const devs=t.kind==='group'?t.data.devices:rowDevices(t.data.row); return `<tr data-i="${i}"><td><input data-k="name" value="${esc(t.name)}"></td><td style="font-size:12px">${t.kind==='group'?'grupa':'maskownica'}</td><td style="font-size:11px;color:var(--ink-2)">${devs.filter(d=>!d.blank).map(d=>esc(d.code+(d.rating?' '+d.rating:''))).join(', ')} (${tplMod(t)} mod)</td><td><label class="chk" style="margin:0"><input type="checkbox" data-k="keepSymbols" ${t.keepSymbols?'checked':''}> stałe</label></td><td><button class="small ghost icon" data-del="${i}">×</button></td></tr>`; }).join('')||'<tr><td colspan="5" style="color:var(--ink-2)">Brak wzorców – zapisz grupę lub maskownicę przyciskiem „Zapisz jako wzorzec”.</td></tr>'; }
+$('tplt').addEventListener('change',e=>{ const tr=e.target.closest('tr'); const k=e.target.dataset.k; if(!tr||!k) return; const t=TEMPLATES[+tr.dataset.i]; t[k]= k==='keepSymbols'? e.target.checked : e.target.value.trim(); saveTemplates(); renderTplList(); });
+$('tplt').addEventListener('click',e=>{ const b=e.target.closest('button[data-del]'); if(!b) return; if(!confirm('Usunąć wzorzec „'+TEMPLATES[+b.dataset.del].name+'”?')) return; TEMPLATES.splice(+b.dataset.del,1); saveTemplates(); renderTpl(); renderTplList(); });
+$('btnTplOut').onclick=()=>saveFile('wzorce.json', JSON.stringify({format:FORMAT,kind:'templates',templates:TEMPLATES},null,1)); $('btnTplIn').onclick=()=>$('tplFile').click();
+$('tplFile').addEventListener('change',e=>readFile(e.target,txt=>{ const p=JSON.parse(txt); if(!p.templates) throw new Error('brak wzorców w pliku'); let n=0; for(const t of p.templates){ if(!TEMPLATES.find(x=>x.id===t.id)){ TEMPLATES.push(t); n++; } } saveTemplates(); renderTpl(); renderTplList(); toast('Dodano wzorce: '+n); }));
 
 /* ===================== Interaction ===================== */
 document.querySelectorAll('.tabs button[data-t]').forEach(b=>b.onclick=()=>{ document.querySelectorAll('.tabs button').forEach(x=>x.classList.toggle('on',x===b)); document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.id==='tab-'+b.dataset.t)); $('side').classList.remove('collapsed'); });
@@ -434,6 +517,7 @@ $('grpEdit').addEventListener('click',e=>{ const b=e.target.closest('button[data
   if(b.dataset.gact==='toLeft'){ selGrp.align='left'; gs.splice(i,1); gs.unshift(selGrp); }
   if(b.dataset.gact==='toRight'){ selGrp.align='right'; gs.splice(i,1); gs.push(selGrp); }
   if(b.dataset.gact==='dup'){ const n=reid(JSON.parse(JSON.stringify(selGrp))); gs.splice(i+1,0,n); selGrp=n; selDev=null; }
+  if(b.dataset.gact==='tpl'){ history.pop(); saveGroupTemplate(selGrp); return; }
   change(); });
 // palette
 $('pal').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; addDevice(DB[+b.dataset.db]); });
@@ -572,8 +656,8 @@ $('orderDetail').addEventListener('click',async e=>{ const el=e.target.closest('
   if(act.dataset.bact==='dup'){ const n=reid(JSON.parse(JSON.stringify(b))); n.name=b.name+' (kopia)'; n.orderId=ORDER.id; n.updated=Date.now(); await IDB.set('board:'+n.id,n); renderOrders(); }
   if(act.dataset.bact==='del'){ if(!confirm('Usunąć rozdzielnicę '+b.name+'?')) return; await IDB.del('board:'+b.id); if(b.id===P.id){ const bs=await listBoards(ORDER.id); if(bs.length) loadBoard(bs[0]); else { const nb=newBoard(); nb.orderId=ORDER.id; loadBoard(nb); } } renderOrders(); } });
 // library modal
-$('btnLib').onclick=()=>{ $('mLib').classList.add('on'); renderDb(); renderEnc(); renderFonts(); renderIconsLib(); };
-$('libTabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; document.querySelectorAll('#libTabs button').forEach(x=>x.classList.toggle('on',x===b)); for(const k of ['dev','enc','fonts','icons']) $('lib'+k.charAt(0).toUpperCase()+k.slice(1)).style.display=b.dataset.l===k?'block':'none'; });
+$('btnLib').onclick=()=>{ $('mLib').classList.add('on'); renderDb(); renderEnc(); renderFonts(); renderIconsLib(); renderTpl(); };
+$('libTabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; document.querySelectorAll('#libTabs button').forEach(x=>x.classList.toggle('on',x===b)); for(const k of ['dev','enc','fonts','icons','tpl']) $('lib'+k.charAt(0).toUpperCase()+k.slice(1)).style.display=b.dataset.l===k?'block':'none'; });
 function renderDb(){ const opt=v=>Object.entries(TABLES).map(([k,n])=>`<option value="${k}" ${(v||'std')===k?'selected':''}>${n}</option>`).join('');
   $('dbt').innerHTML=`<tr><th>Kod</th><th>Nazwa</th><th>Mod.</th><th>Pref.</th><th>Model</th><th>Tabelka</th><th></th></tr>`+DB.map((d,i)=>`<tr data-i="${i}"><td><input data-k="code" value="${esc(d.code)}" style="width:80px"></td><td><input data-k="name" value="${esc(d.name)}"></td><td class="n"><input data-k="mod" type="number" step="0.5" value="${d.mod}"></td><td class="n"><input data-k="prefix" value="${esc(d.prefix)}"></td><td><input data-k="rating" value="${esc(d.rating||'')}" style="width:90px"></td><td><select data-k="table" style="width:130px">${opt(d.table)}</select></td><td><button class="small ghost icon" data-del="${i}">×</button></td></tr>`).join(''); }
 $('dbt').addEventListener('change',e=>{ const tr=e.target.closest('tr'); const k=e.target.dataset.k; if(!tr||!k) return; const d=DB[+tr.dataset.i]; d[k]= k==='mod'? +e.target.value : e.target.value.trim(); SETTINGS.libUpdated=Date.now(); renderPalette(); saveLibrary(); });
@@ -610,7 +694,7 @@ $('btnSettings').onclick=async()=>{ $('mSet').classList.add('on'); $('gClientId'
 $('btnTheme').onclick=async()=>{ SETTINGS.theme=SETTINGS.theme==='dark'?'light':'dark'; document.documentElement.dataset.theme=SETTINGS.theme; await IDB.set('settings',SETTINGS); };
 $('btnBackup').onclick=async()=>{ await saveNow(); const keys=await IDB.keys(''); const data={}; for(const k of keys) data[k]=await IDB.get(k); saveFile(`eitlab-kopia-${new Date().toISOString().slice(0,10)}.json`, JSON.stringify({format:FORMAT,kind:'backup',app:APP_NAME,version:APP_VER,data},null,0)); };
 $('btnRestore').onclick=()=>$('restoreFile').click();
-$('restoreFile').addEventListener('change',e=>readFile(e.target, async txt=>{ const p=JSON.parse(txt); if(p.kind!=='backup'||!p.data) throw new Error('to nie jest kopia bazy'); if(!confirm('Wczytać kopię? Istniejące zlecenia o tych samych identyfikatorach zostaną nadpisane.')) return; for(const [k,v] of Object.entries(p.data)) if(k!=='settings') await IDB.set(k,v); if(p.data.devices) DB=p.data.devices; if(p.data.enclosures) ENC=p.data.enclosures; if(p.data.fonts) USERFONTS=p.data.fonts; if(p.data.icons) USERICONS=p.data.icons; renderPalette(); refreshFontSelects(); toast('Kopia wczytana'); renderOrders(); }));
+$('restoreFile').addEventListener('change',e=>readFile(e.target, async txt=>{ const p=JSON.parse(txt); if(p.kind!=='backup'||!p.data) throw new Error('to nie jest kopia bazy'); if(!confirm('Wczytać kopię? Istniejące zlecenia o tych samych identyfikatorach zostaną nadpisane.')) return; for(const [k,v] of Object.entries(p.data)) if(k!=='settings') await IDB.set(k,v); if(p.data.devices) DB=p.data.devices; if(p.data.enclosures) ENC=p.data.enclosures; if(p.data.fonts) USERFONTS=p.data.fonts; if(p.data.icons) USERICONS=p.data.icons; if(p.data.templates) TEMPLATES=p.data.templates; renderPalette(); refreshFontSelects(); renderTplList(); toast('Kopia wczytana'); renderOrders(); }));
 $('btnGSignIn').onclick=gSignIn; $('btnGSync').onclick=()=>driveSync(false); $('btnGSignOut').onclick=()=>{ gToken=null; gMsg('Wylogowano.'); };
 $('gAuto').addEventListener('change',async e=>{ SETTINGS.gAuto=e.target.checked; await IDB.set('settings',SETTINGS); });
 $('gClientId').addEventListener('change',async e=>{ SETTINGS.gClientId=e.target.value.trim(); await IDB.set('settings',SETTINGS); });
@@ -687,7 +771,7 @@ function tableCode(v){ const t=norm(v); if(!t||t==='STD'||t==='STANDARD') return
 function parseCsv(text){
   const out={name:null,tag:null,rev:null,order:null,pitch:null,cabGap:null,cabinets:[],db:[],label:null,warn:[]}; let cab=null, cover=null, grp=null;
   text.replace(/^\uFEFF/,'').split(/\r?\n/).forEach((raw,ln)=>{ const l=raw.trim(); if(!l||l.startsWith('#')) return; const cells=(l.includes(';')?l.split(';'):l.split('\t')).map(c=>c.trim()); const k=norm(cells[0]); const a=cells.slice(1);
-    const needCab=()=>{ if(!cab){ cab=newCab(); out.cabinets.push(cab); out.warn.push(`wiersz ${ln+1}: brak SZAFA – utworzono domyślną`); } };
+    const needCab=()=>{ if(!cab){ cab=newCab(); out.cabinets.push(cab); out.autoCab=true; } };
     const parseAlign=v=>{ const t=norm(v); if(!t||t==='LEWA'||t==='LEFT'||t==='L') return {align:'left'}; if(t==='PRAWA'||t==='RIGHT'||t==='P'||t==='R') return {align:'right'}; const n=num(v,null); return n!=null?{align:'free',x:Math.max(0,Math.round(n))}:{align:'left'}; };
     switch(k){
       case 'PROJEKT': case 'PROJECT': out.name=a[0]||null; out.tag=a[1]||null; out.rev=a[2]||null; break;
@@ -724,7 +808,8 @@ function applyCsv(parsed, replace){
   const w=[...parsed.warn]; if(added.length) w.push('Dodano do bazy nieznane kody: '+[...new Set(added)].join(', ')+' (uzupełnij w Bibliotece)');
   const m=$('csvMsg'); m.style.display='block'; m.className='msg'+(parsed.warn.length?' err':' ok'); m.textContent=`Wczytano ${parsed.cabinets.length} szaf, ${parsed.cabinets.reduce((a,c)=>a+c.items.length,0)} elementów.`+(w.length?' '+w.join(' · '):''); }
 function tableOut(t){ if(!t||t==='std') return ''; return t[1]+(t[0]==='c'?'obok':''); }
-function exportCsv(){ const q=v=>String(v==null?'':v).replace(/;/g,','); const L=P.label; let o=[`# ${APP_NAME} ${APP_VER} – eksport ${new Date().toLocaleString('pl-PL')} (format CSV v3)`,`PROJEKT; ${q(P.name)}; ${q(P.tag)}; ${q(P.revision)}`,`ZLECENIE; ${q(ORDER.number)}; ${q(ORDER.client)}; ${q(ORDER.object)}; ${q(ORDER.address)}`,`MODUL; ${P.pitch}`,`ODSTEP; ${P.cabGap||0}`,`RAMKA; ${L.h}; ${L.gap}; ${L.symH}; ${L.nameH}; ${L.lwMain}; ${L.frameR}; ${L.split}; ${L.lwDivV}; ${L.lwDivH}`];
+function exportCsv(only){ const q=v=>String(v==null?'':v).replace(/;/g,','); const L=P.label; if(only){ const r=only.row; const pos=r.pos==='niche'?'srodek': r.pos==='top'?(r.nicheY==null?'blok':r.nicheY):'blok'; let o=[`# ${APP_NAME} – opisy rzędu`,`MASKOWNICA; ${only.w}; ${only.h}; ${r.mod}; ${r.nicheH}; ${pos}`]; const gx=groupX(r); for(const g of r.groups){ o.push(`GRUPA; ${q(g.name)}; ${g.align==='left'?'lewa':g.align==='right'?'prawa':gx.get(g.id)}; ${q(g.bot)}`); for(const d of g.devices) o.push(`APARAT; ${q(d.code)}; ${d.auto===false?q(d.symbol):''}; ${q(d.name)}; ; ${tableOut(d.table)}; ${d.mod}; ${d.symH||''}; ${d.nameH||''}; ${q(d.rating)}; ${q(d.icon||'')}; ${d.icon?(d.iconPos||'left'):''}`); } return o.join('\n')+'\n'; }
+  let o=[`# ${APP_NAME} ${APP_VER} – eksport ${new Date().toLocaleString('pl-PL')} (format CSV v3)`,`PROJEKT; ${q(P.name)}; ${q(P.tag)}; ${q(P.revision)}`,`ZLECENIE; ${q(ORDER.number)}; ${q(ORDER.client)}; ${q(ORDER.object)}; ${q(ORDER.address)}`,`MODUL; ${P.pitch}`,`ODSTEP; ${P.cabGap||0}`,`RAMKA; ${L.h}; ${L.gap}; ${L.symH}; ${L.nameH}; ${L.lwMain}; ${L.frameR}; ${L.split}; ${L.lwDivV}; ${L.lwDivH}`];
   for(const d of DB) o.push(`BAZA; ${q(d.code)}; ${q(d.name)}; ${d.mod}; ${q(d.prefix)}; ${tableOut(d.table)||'std'}; ${q(d.rating)}${d.blank?'; zaslepka':''}`);
   for(const c of P.cabinets){ o.push(`SZAFA; ${c.w}; ${c.h}; ${c.plinth||0}`); for(const it of c.items){
     if(it.type==='empty') o.push(`PUSTE; ${it.h}; ${it.w}`); else if(it.type==='plate') o.push(`PLYTA; ${it.w}; ${it.h}`); else if(it.type==='blank') o.push(`ZASLEPKA; ${it.w}; ${it.h}`);
@@ -742,7 +827,7 @@ $('btnCsvSpec').onclick=()=>saveFile('eitlab-format-csv.txt', CSV_SPEC);
 (async function boot(){
   renderLayers();
   await IDB.open();
-  const uf=await IDB.get('fonts'); if(uf&&uf.length) USERFONTS=uf; const ui=await IDB.get('icons'); if(ui&&ui.length) USERICONS=ui;
+  const uf=await IDB.get('fonts'); if(uf&&uf.length) USERFONTS=uf; const ui=await IDB.get('icons'); if(ui&&ui.length) USERICONS=ui; const ut=await IDB.get('templates'); if(ut&&ut.length) TEMPLATES=ut;
   $('font').innerHTML=fontSelectOptions(); $('fontSym').innerHTML=fontSelectOptions(); $('fontInfo').innerHTML=fontSelectOptions();
   const st=await IDB.get('settings'); if(st) SETTINGS=Object.assign(SETTINGS,st); document.documentElement.dataset.theme=SETTINGS.theme||'light';
   const dbs=await IDB.get('devices'); if(dbs&&dbs.length) DB=dbs; for(const d of DB){ if(!d.table) d.table='std'; if(d.rating==null) d.rating=''; }
