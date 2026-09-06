@@ -1,5 +1,10 @@
 # Historia zmian
 
+## 5.5 (2026-09-06)
+- Elementy niestandardowe na maskownicy: wycięcie prostokątne lub okrągłe o dowolnym wymiarze, położenie X/Y od rogu maskownicy lub wyśrodkowane (przyciągane przy przeciąganiu), otwory mocujące z rozstawem, ramka opisu nad/pod/obok o własnej szerokości, symbol, nazwa, model, ikona; dowolna liczba na maskownicy, także bez wycięcia modułowego (0 modułów)
+- W bazie aparatów rodzaj „element” z kształtem i wymiarem wycięcia; wpisy startowe: WG (pokrętło 92×92), ATS, analizator, miernik 72×72, przycisk i lampka Ø22,5
+- Elementy w numeracji, tabeli opisów, DXF (CUT/HOLES/ramki/teksty), PDF, zestawieniu, wzorcach maskownic, kontroli projektu (kolizja z wycięciem modułowym, wyjście poza maskownicę) i CSV (wiersz ELEMENT)
+
 ## 5.4 (2026-09-05)
 - Klamka drzwi jak w rzeczywistej szafie (uchylna, 26×140 mm, zamek u dołu) o stałej wielkości niezależnie od szafy; numer wersji przy tytule
 

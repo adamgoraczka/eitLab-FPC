@@ -17,6 +17,12 @@ const DEFAULT_DB = [
   {code:'H',name:'Lampka',mod:1,prefix:'H',table:'std',rating:''},
   {code:'PRZ',name:'Przełącznik 3-poz.',mod:1,prefix:'S',table:'r3',rating:''},
   {code:'Z',name:'Zaślepka',mod:1,prefix:'',blank:true,table:'std',rating:''},
+ {code:'WG',name:'Wyłącznik główny (pokrętło)',mod:0,prefix:'Q',table:'std',rating:'250A',kind:'custom',shape:'rect',cw:92,ch:92,holes:{n:4,dx:70,dy:70,d:5}},
+ {code:'ATS',name:'Przełącznik ATS',mod:0,prefix:'Q',table:'std',rating:'',kind:'custom',shape:'rect',cw:140,ch:100,holes:{n:4,dx:120,dy:80,d:5}},
+ {code:'AN',name:'Analizator sieci',mod:0,prefix:'P',table:'std',rating:'',kind:'custom',shape:'rect',cw:92,ch:92,holes:{n:0}},
+ {code:'MIER',name:'Miernik 72×72',mod:0,prefix:'P',table:'std',rating:'',kind:'custom',shape:'rect',cw:68,ch:68,holes:{n:0}},
+ {code:'PB',name:'Przycisk Ø22,5',mod:0,prefix:'S',table:'std',rating:'',kind:'custom',shape:'circle',cw:22.5,ch:22.5,holes:{n:0}},
+ {code:'LK',name:'Lampka Ø22,5',mod:0,prefix:'H',table:'std',rating:'',kind:'custom',shape:'circle',cw:22.5,ch:22.5,holes:{n:0}},
 ];
 const DEFAULT_ENC = [
   {name:'Szafa 600×2000 (cokół 100)',w:600,h:2000,plinth:100,coverW:'500',coverH:'150,200,300'},
@@ -43,14 +49,15 @@ let selCab=null, selItem=null, selGrp=null, selDev=null, multi=new Set(), histor
 function snapshot(){ history.push(JSON.stringify(P)); if(history.length>50) history.shift(); future.length=0; }
 function coverItems(){ const out=[]; P.cabinets.forEach((c,ci)=>c.items.forEach((it,ii)=>{ if(it.type==='cover') out.push({cab:c,item:it,ci,ii}); })); return out; }
 function rowDevices(r){ return r.groups.flatMap(g=>g.devices); }
+function itemDevices(it){ return rowDevices(it.row).concat(it.custom||[]); }
 function groupMod(g){ return Math.max(g.devices.reduce((a,d)=>a+d.mod,0), g.devices.length?0:2); }
 function groupX(r){ const m=new Map(); let L=0; for(const g of r.groups) if(g.align==='left'){ m.set(g.id,L); L+=groupMod(g); }
   let R=r.mod; for(const g of [...r.groups].reverse()) if(g.align==='right'){ R-=groupMod(g); m.set(g.id,R); }
   let cur=L; for(const g of r.groups.filter(x=>x.align==='free').sort((a,b)=>(a.x||0)-(b.x||0))){ const gm=groupMod(g); let x=Math.max(cur, g.x||0); x=Math.min(x, R-gm); x=Math.max(L,x); m.set(g.id,x); cur=x+gm; } return m; }
 function freeRange(r, g){ let L=0; for(const o of r.groups) if(o!==g&&o.align==='left') L+=groupMod(o); let R=r.mod; for(const o of r.groups) if(o!==g&&o.align==='right') R-=groupMod(o); return [L, R-groupMod(g)]; }
-function renumber(){ const cnt={}; for(const {item} of coverItems()){ const gx=groupX(item.row); const list=[]; for(const g of item.row.groups){ let m=gx.get(g.id); for(const d of g.devices){ list.push({d,x:m}); m+=d.mod; } } list.sort((a,b)=>a.x-b.x);
+function renumber(){ const cnt={}; for(const {item} of coverItems()){ const gx=groupX(item.row); const list=[]; for(const g of item.row.groups){ let m=gx.get(g.id); for(const d of g.devices){ list.push({d,x:m}); m+=d.mod; } } for(const el of (item.custom||[])) list.push({d:el, x: 10000 + (el.x==null? item.w/2 : el.x)}); list.sort((a,b)=>a.x-b.x);
     for(const {d} of list){ if(d.blank) continue; if(d.auto!==false){ if((d.table||'std')!=='std'){ d.symbol=''; continue; } const pf=d.prefix||''; cnt[pf]=(cnt[pf]||0)+1; d.symbol=pf+cnt[pf]; } } } }
-function findDev(id){ for(const {cab,item} of coverItems()) for(const g of item.row.groups){ const i=g.devices.findIndex(d=>d.id===id); if(i>=0) return {cab,item,row:item.row,grp:g,idx:i,dev:g.devices[i]}; } return null; }
+function findDev(id){ for(const {cab,item} of coverItems()){ for(const g of item.row.groups){ const i=g.devices.findIndex(d=>d.id===id); if(i>=0) return {cab,item,row:item.row,grp:g,idx:i,dev:g.devices[i]}; } const ci=(item.custom||[]).findIndex(d=>d.id===id); if(ci>=0) return {cab,item,row:item.row,grp:null,idx:ci,dev:item.custom[ci],custom:true}; } return null; }
 function findGrp(id){ for(const {cab,item} of coverItems()){ const g=item.row.groups.find(x=>x.id===id); if(g) return {cab,item,row:item.row,grp:g}; } return null; }
 function findItem(id){ for(const c of P.cabinets){ const it=c.items.find(x=>x.id===id); if(it) return {cab:c,item:it}; } return null; }
 function makeDev(db, name){ return {id:uid(), code:db.code, name:db.blank?'':(name!=null?name:db.name), mod:db.mod, prefix:db.prefix, blank:!!db.blank, auto:true, symbol:'', table:db.table||'std', rating:db.rating||''}; }
@@ -59,6 +66,9 @@ function addDevice(db){ let it=selItem&&selItem.type==='cover'? selItem : (cover
   const d=makeDev(db); g.devices.push(d); selDev=d; multi.clear(); selGrp=g; selItem=it; change(); }
 function addGroup(align){ const it=selItem&&selItem.type==='cover'? selItem : null; if(!it){ toast('Zaznacz maskownicę z wycięciem'); return; } snapshot(); const g=newGroup('', align||'left'); it.row.groups.push(g); selGrp=g; selDev=null; change(); }
 function cabTotalH(c){ return c.h+(c.plinth||0); }
+function makeCustom(db){ return {id:uid(), code:db.code, name:db.name||'', mod:0, prefix:db.prefix||'', auto:true, symbol:'', table:'std', rating:db.rating||'', shape:db.shape||'rect', w:db.cw||92, h:db.ch||92, x:null, y:null, holes:Object.assign({n:0,dx:0,dy:0,d:5},db.holes||{}), labelPos:'above', labelW:null, labelGap:2, icon:'', iconPos:'left', custom:true}; }
+function addCustom(db){ const it=selItem&&selItem.type==='cover'? selItem : (coverItems()[0]&&coverItems()[0].item); if(!it){ toast('Najpierw dodaj maskownicę'); return; } snapshot(); it.custom=it.custom||[]; const el=makeCustom(db); it.custom.push(el); selDev=el; selGrp=null; selItem=it; TABLE_SIG=''; change(); }
+function customBox(box, el){ return {x: box.x + (el.x==null? (box.w-el.w)/2 : el.x), y: box.y + (el.y==null? (box.h-el.h)/2 : el.y), w:el.w, h:el.h}; }
 
 /* ===================== Geometry ===================== */
 function cabX(c){ let x=0; for(const k of P.cabinets){ if(k===c) return x; x+=k.w+(P.cabGap||0); } return x; }
@@ -98,7 +108,7 @@ function coverGeometry(cab,it){
   const hasTop=r.groups.some(g=>g.name&&g.devices.some(d=>!d.blank)), hasBot=r.groups.some(g=>g.bot&&g.devices.some(d=>!d.blank));
   const GT=P.grpTop||defaultGrp('top'), GB=P.grpBot||defaultGrp('bot');
   const topSpace = hasTop? grpSpaceOf(GT,true) : 0, botSpace = hasBot? grpSpaceOf(GB,true) : 0;
-  const blockH = L.h+L.gap+r.nicheH+topSpace+botSpace;
+  const blockH = r.mod>0? L.h+L.gap+r.nicheH+topSpace+botSpace : 0;
   const pos=r.pos||'block'; let nicheTop;
   if(pos==='top') nicheTop = box.y + (r.nicheY==null? blockH-botSpace-r.nicheH : r.nicheY);
   else if(pos==='niche') nicheTop = box.y + (box.h-r.nicheH)/2;
@@ -108,7 +118,7 @@ function coverGeometry(cab,it){
   for(const g of r.groups){ const x0=gx.get(g.id); let m=x0; const gi={grp:g, x:nx+x0*px, w:groupMod(g)*px, m0:x0, labels:[]}; groups.push(gi);
     for(const d of g.devices){ const lb={dev:d, grp:g, x:nx+m*px, w:d.mod*px, m}; labels.push(lb); gi.labels.push(lb); m+=d.mod; } }
   labels.sort((a,b)=>a.x-b.x);
-  polys.push(rect(box.x,box.y,box.w,box.h,'CUT')); polys.push(rect(nx,nicheTop,nicheW,r.nicheH,'CUT'));
+  polys.push(rect(box.x,box.y,box.w,box.h,'CUT')); if(r.mod>0) polys.push(rect(nx,nicheTop,nicheW,r.nicheH,'CUT'));
   const H=P.holes||{n:0}; if(H.n>0){ const o=H.off||10, rr=(H.d||5)/2; const pts=[[box.x+o,box.y+o],[box.x+box.w-o,box.y+o],[box.x+o,box.y+box.h-o],[box.x+box.w-o,box.y+box.h-o]]; if(H.n>=6){ pts.push([box.x+box.w/2,box.y+o],[box.x+box.w/2,box.y+box.h-o]); } for(const p of pts) polys.push(circle(p[0],p[1],rr,'HOLES')); }
   let i=0; while(i<labels.length){ if(labels[i].dev.blank){i++;continue;} let j=i; while(j+1<labels.length && !labels[j+1].dev.blank && Math.abs(labels[j+1].x-(labels[j].x+labels[j].w))<0.01) j++;
     const run=labels.slice(i,j+1); const x1=run[0].x, x2=run[run.length-1].x+run[run.length-1].w;
@@ -134,8 +144,25 @@ function coverGeometry(cab,it){
   if(P.info&&P.info.on){ const ih=P.info.h||3; polys.push(...fitText(coverInfoText(cab,it), ih, box.x+3, box.y+2, box.w-6, ih*1.6, 0,'INFO',L.fontInfo||L.font,{raw:true,align:'left'})); }
   const Q=P.qr||{pos:0}; if(Q.pos>0){ const sz=Q.size||15; const qx= (Q.pos===2)? box.x+3 : box.x+box.w-3-sz; const qy= (Q.pos===1)? box.y+3 : box.y+box.h-3-sz; polys.push(...qrPolys(coverInfoText(cab,it), qx, qy, sz, 'QR')); }
   for(const lb of labels) polys.push(rect(lb.x+0.3,nicheTop+2,lb.w-0.6,r.nicheH-4,'DEVICES'));
-  polys.push(line(nx,nicheTop+r.nicheH/2,nx+nicheW,nicheTop+r.nicheH/2,'RAIL')); for(let k=0;k<=r.mod;k++) polys.push(line(nx+k*px,nicheTop,nx+k*px,nicheTop+r.nicheH,'RAIL'));
-  return {box, labels, groups, polys, nx, nicheW, nicheTop, labTop, labBottom, topSpace, botSpace};
+  if(r.mod>0){ polys.push(line(nx,nicheTop+r.nicheH/2,nx+nicheW,nicheTop+r.nicheH/2,'RAIL')); for(let k=0;k<=r.mod;k++) polys.push(line(nx+k*px,nicheTop,nx+k*px,nicheTop+r.nicheH,'RAIL')); }
+  // custom (non-modular) elements
+  const customs=[];
+  for(const el of (it.custom||[])){ const cb=customBox(box,el); const cx=cb.x+cb.w/2, cy=cb.y+cb.h/2;
+    if(el.shape==='circle') polys.push(circle(cx,cy,Math.min(cb.w,cb.h)/2,'CUT')); else polys.push(rect(cb.x,cb.y,cb.w,cb.h,'CUT'));
+    const H2=el.holes||{n:0}; if(H2.n>=4&&H2.dx>0&&H2.dy>0){ for(const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]]) polys.push(circle(cx+sx*H2.dx/2, cy+sy*H2.dy/2, (H2.d||5)/2,'HOLES')); }
+    polys.push(rect(cb.x-2,cb.y-2,cb.w+4,cb.h+4,'DEVICES'));
+    const lw2=el.labelW||Math.max(cb.w, 3*px); const gap=el.labelGap==null?2:el.labelGap; const lp=el.labelPos||'above'; let lb=null;
+    if(lp==='above') lb={x:cx-lw2/2, y:cb.y-gap-L.h, w:lw2, h:L.h}; else if(lp==='below') lb={x:cx-lw2/2, y:cb.y+cb.h+gap, w:lw2, h:L.h}; else if(lp==='left') lb={x:cb.x-gap-lw2, y:cy-L.h/2, w:lw2, h:L.h}; else if(lp==='right') lb={x:cb.x+cb.w+gap, y:cy-L.h/2, w:lw2, h:L.h};
+    customs.push({el, cb, lb});
+    if(lb){ const d=el; const symH=d.symH||L.symH, nameH=d.nameH||L.nameH; const sY=lb.y+L.h*(L.split/100);
+      if(L.frame) polys.push(...frame(lb.x,lb.y,lb.w,lb.h,'FRAME_MAIN',lwM,L.frameR||0)); if(L.divH) polys.push(seg(lb.x+lwM,sY,lb.x+lb.w-lwM,sY,'FRAME_DIV_H',lwH));
+      const upper=[lb.x,lb.y,lb.w,sY-lb.y], lower=[lb.x,sY,lb.w,lb.y+lb.h-sY]; const symBox=L.symTop?upper:lower; let nameBox=L.symTop?lower:upper;
+      if(d.symbol) polys.push(...fitText(d.symbol, symH, ...symBox, L.pad,'TEXT_SYMBOL',L.fontSym||L.font,{tag:'symbol:'+d.id}));
+      let nm=(d.name||'').replace(/\|/g,'/'); if(L.showRating&&d.rating) nm=(nm?nm+'/':'')+d.rating; const ipos=d.icon?(d.iconPos||'left'):''; const isc=(d.iconScale||L.iconScale||0.9);
+      if(ipos==='replace') polys.push(...iconPolys(d.icon,nameBox[0]+L.pad,nameBox[1]+L.pad,nameBox[2]-2*L.pad,nameBox[3]-2*L.pad,'ICON',isc));
+      else { if(ipos==='left'||ipos==='right'){ const side=Math.min(nameBox[3], nameBox[2]*0.4); const ix= ipos==='left'? nameBox[0]+L.pad : nameBox[0]+nameBox[2]-side-L.pad; polys.push(...iconPolys(d.icon, ix, nameBox[1]+L.pad, side-L.pad, nameBox[3]-2*L.pad,'ICON',isc)); nameBox= ipos==='left'? [nameBox[0]+side, nameBox[1], nameBox[2]-side, nameBox[3]] : [nameBox[0], nameBox[1], nameBox[2]-side, nameBox[3]]; }
+        if(nm) polys.push(...fitText(nm, nameH, ...nameBox, L.pad,'TEXT_NAME',L.font,{tag:'name:'+d.id})); } } }
+  return {box, labels, groups, customs, polys, nx, nicheW, nicheTop, labTop, labBottom, topSpace, botSpace};
 }
 function cabGeometry(c){ let polys=[]; const x=cabX(c); polys.push(rect(x,0,c.w,c.h,'CABINET')); if(c.plinth>0) polys.push(rect(x,c.h,c.w,c.plinth,'CABINET'));
   for(const it of c.items){ const b=itemBox(c,it); if(it.type==='cover') polys=polys.concat(coverGeometry(c,it).polys); else if(it.type==='blank') polys.push(rect(b.x,b.y,b.w,b.h,'CUT')); else if(it.type==='plate') polys.push(rect(b.x,b.y,b.w,b.h,'PLATE')); else polys.push(rect(b.x,b.y,b.w,b.h,'CABINET')); }
@@ -202,7 +229,7 @@ function exportPdf(){ const scope=$('pdfScope').value, mode=$('pdfMode').value; 
   const pdf=makePdf(pages.map(pg=>pdfPage(pg.polys,pg.box,pg.title,sub,mode)));
   const bytes=new Uint8Array(pdf.length); for(let i=0;i<pdf.length;i++) bytes[i]=pdf.charCodeAt(i)&255;
   saveFile(`${fname(P.tag||P.name)}_${scope}.pdf`, bytes, 'application/pdf'); }
-function exportBom(){ const rows=[['Szafa','Maskownica','Grupa','Symbol','Kod','Model','Nazwa','Moduły']]; for(const {cab,item} of coverItems()){ const ci=P.cabinets.indexOf(cab)+1, ii=cab.items.indexOf(item)+1; for(const g of item.row.groups) for(const d of g.devices){ if(d.blank) continue; rows.push([ci,ii,g.name,d.symbol,d.code,d.rating||'',(d.name||'').replace(/\|/g,' / '),d.mod]); } }
+function exportBom(){ const rows=[['Szafa','Maskownica','Grupa','Symbol','Kod','Model','Nazwa','Moduły']]; for(const {cab,item} of coverItems()){ const ci=P.cabinets.indexOf(cab)+1, ii=cab.items.indexOf(item)+1; for(const g of item.row.groups) for(const d of g.devices){ if(d.blank) continue; rows.push([ci,ii,g.name,d.symbol,d.code,d.rating||'',(d.name||'').replace(/\|/g,' / '),d.mod]); } for(const el of (item.custom||[])) rows.push([ci,ii,'',el.symbol,el.code,el.rating||'',(el.name||'').replace(/\|/g,' / '),(el.shape==='circle'?'Ø'+el.w:el.w+'x'+el.h)+' mm']); }
   saveFile(`${fname(P.tag||P.name)}_zestawienie.csv`, '\uFEFF'+rows.map(r=>r.map(v=>String(v).replace(/;/g,',')).join(';')).join('\n')); }
 
 /* ===================== Render ===================== */
@@ -254,7 +281,15 @@ function renderCanvas(){
           if(!gi.labels.length) s+=`<rect x="${gi.x}" y="${g.labTop}" width="${gi.w}" height="${P.label.h+P.label.gap+r.nicheH}" fill="none" stroke="var(--sel)" stroke-width=".6" stroke-dasharray="2 1.5" vector-effect="non-scaling-stroke"/>`;
           s+=`<text x="${gi.x+1}" y="${hy+hh*0.78}" font-size="${hh*0.7}" fill="#fff">${ic} ${esc(gi.grp.name||'grupa')}</text></g>`; }
         for(const lb of g.labels) if(!lb.dev.blank&&P.label.frame) s+=`<rect x="${lb.x}" y="${g.labTop}" width="${lb.w}" height="${P.label.h}" fill="var(--lab)"/>`;
+        for(const cu of g.customs) if(cu.lb&&P.label.frame) s+=`<rect x="${cu.lb.x}" y="${cu.lb.y}" width="${cu.lb.w}" height="${cu.lb.h}" fill="var(--lab)"/>`;
         s+=svgFrame(g.polys, FR)+svgText(g.polys, TX); { const ic=g.polys.filter(p=>p.layer==='ICON'); if(ic.length) s+=`<path d="${ic.map(pathD).join(' ')}" fill="var(--ink)" fill-rule="evenodd"/>`; }
+        for(const cu of g.customs){ const el=cu.el, cb=cu.cb; const sel=el===selDev; nDev++; const over= cb.x<b.x||cb.y<b.y||cb.x+cb.w>b.x+b.w||cb.y+cb.h>b.y+b.h;
+          s+=`<g class="cel${sel?' sel':''}" data-cel="${el.id}">`;
+          if(el.shape==='circle'){ const rr=Math.min(cb.w,cb.h)/2; s+=`<circle cx="${cb.x+cb.w/2}" cy="${cb.y+cb.h/2}" r="${rr}" fill="var(--niche)" stroke="${sel?'var(--sel)':over?'var(--danger)':'var(--dev-edge)'}" stroke-width="${sel?1.4:.7}" vector-effect="non-scaling-stroke"/><circle cx="${cb.x+cb.w/2}" cy="${cb.y+cb.h/2}" r="${rr*0.75}" fill="var(--dev)" stroke="var(--dev-edge)" stroke-width=".4" vector-effect="non-scaling-stroke"/>`; }
+          else { s+=`<rect x="${cb.x}" y="${cb.y}" width="${cb.w}" height="${cb.h}" fill="var(--niche)" stroke="${sel?'var(--sel)':over?'var(--danger)':'var(--dev-edge)'}" stroke-width="${sel?1.4:.7}" vector-effect="non-scaling-stroke"/><rect x="${cb.x+2}" y="${cb.y+2}" width="${cb.w-4}" height="${cb.h-4}" rx="1.5" fill="var(--dev)" stroke="var(--dev-edge)" stroke-width=".4" vector-effect="non-scaling-stroke"/>`;
+            if(/WG|Q/.test(el.prefix||'')&&cb.w>=40){ const c2=[cb.x+cb.w/2,cb.y+cb.h/2]; s+=`<circle cx="${c2[0]}" cy="${c2[1]}" r="${Math.min(cb.w,cb.h)*0.3}" fill="none" stroke="var(--dev-edge)" stroke-width=".6" vector-effect="non-scaling-stroke"/><rect x="${c2[0]-Math.min(cb.w,cb.h)*0.05}" y="${c2[1]-Math.min(cb.w,cb.h)*0.28}" width="${Math.min(cb.w,cb.h)*0.1}" height="${Math.min(cb.w,cb.h)*0.56}" rx="1" fill="var(--dev-edge)" opacity=".8"/>`; } }
+          const txt=MODE==='install'? (el.symbol||el.code)+(el.rating?' · '+el.rating:'') : el.code; const fs3=Math.min(cb.w*0.22, 6, cb.w*1.6/Math.max(1,txt.length)); if(el.shape!=='circle') s+=`<text x="${cb.x+cb.w/2}" y="${cb.y+cb.h-3}" font-size="${fs3}" text-anchor="middle" fill="var(--ink-2)">${esc(txt)}</text>`;
+          s+=`</g>`; }
         for(const lb of g.labels){ const d=lb.dev; nDev++; const over=lb.m+d.mod>r.mod||lb.m<0; const sel=d===selDev||multi.has(d.id);
           s+=`<g class="dev${sel?' sel':''}${over?' overflow':''}" data-dev="${d.id}"><rect class="body" x="${lb.x+0.4}" y="${g.nicheTop+2}" width="${lb.w-0.8}" height="${r.nicheH-4}" fill="${d.blank?'var(--niche)':'var(--dev)'}" stroke="var(--dev-edge)" stroke-width=".5" vector-effect="non-scaling-stroke"/>`;
           if(!d.blank){ const narrow=lb.w<2.2*P.pitch; const cx=lb.x+lb.w/2, cy=g.nicheTop+r.nicheH*0.62; const txt=MODE==='install'? (d.symbol||d.code)+(d.rating?' · '+d.rating:'') : d.code; const rat=MODE==='install'&&!d.rating;
@@ -287,7 +322,7 @@ function renderItems(){ const c=selCab; if(!c){ $('items').innerHTML='<div class
   const it=selItem; if(!it||!findItem(it.id)||findItem(it.id).cab!==c){ $('itemEdit').innerHTML=''; return; }
   let h=`<h3>${esc(ITEM_NAMES[it.type])}</h3><div class="row three"><label class="f">Typ<select data-if="type"><option value="cover" ${it.type==='cover'?'selected':''}>Maskownica z wycięciem</option><option value="blank" ${it.type==='blank'?'selected':''}>Maskownica zaślepka</option><option value="plate" ${it.type==='plate'?'selected':''}>Płyta montażowa</option><option value="empty" ${it.type==='empty'?'selected':''}>Puste pole</option></select></label>
     <label class="f">Szerokość mm<input type="number" data-if="w" value="${it.w}" step="10"></label><label class="f">Wysokość mm<input type="number" data-if="h" value="${it.h}" step="10"></label></div>`;
-  if(it.type==='cover'){ const pos=it.row.pos||'block'; h+=`<div class="row four"><label class="f">Moduły<input type="number" data-if="mod" value="${it.row.mod}" step="1" min="1"></label><label class="f">Wys. wycięcia mm<input type="number" data-if="nicheH" value="${it.row.nicheH}" step="1"></label>
+  if(it.type==='cover'){ const pos=it.row.pos||'block'; h+=`<div class="row four"><label class="f">Moduły (0 = bez wycięcia)<input type="number" data-if="mod" value="${it.row.mod}" step="1" min="0"></label><label class="f">Wys. wycięcia mm<input type="number" data-if="nicheH" value="${it.row.nicheH}" step="1"></label>
     <label class="f">Położenie w pionie<select data-if="pos"><option value="block" ${pos==='block'?'selected':''}>Blok na środku</option><option value="niche" ${pos==='niche'?'selected':''}>Wycięcie na środku</option><option value="top" ${pos==='top'?'selected':''}>Od góry (mm)</option></select></label>
     <label class="f">Wycięcie od góry mm<input type="number" data-if="nicheY" value="${it.row.nicheY==null?'':it.row.nicheY}" step="1" ${pos!=='top'?'disabled':''}></label></div><div class="btns"><button class="small" id="btnItemTable">Tabela opisów</button><button class="small ghost" id="btnItemTpl">Zapisz maskownicę jako wzorzec</button></div>`; }
   $('itemEdit').innerHTML=h; const bt=$('btnItemTable'); if(bt) bt.onclick=()=>{ TABLE_ON=true; if(VIEW!=='item'){ VIEW='item'; document.querySelectorAll('#view button').forEach(x=>x.classList.toggle('on',x.dataset.v===VIEW)); ZOOM.key=''; } render(); }; const bp=$('btnItemTpl'); if(bp) bp.onclick=()=>saveCoverTemplate(it); }
@@ -298,7 +333,7 @@ function renderGroups(){ const it=selItem&&selItem.type==='cover'?selItem:null; 
   $('grpEdit').innerHTML=`<div class="row" style="margin-top:8px"><label class="f">Podpis górny (pusty = bez linii)<input data-gf="name" value="${esc(g.name)}"></label><label class="f">Podpis dolny<input data-gf="bot" value="${esc(g.bot||'')}"></label></div>
     <div class="row"><label class="f">Położenie<select data-gf="align"><option value="left" ${g.align==='left'?'selected':''}>Do lewej krawędzi</option><option value="right" ${g.align==='right'?'selected':''}>Do prawej krawędzi</option><option value="free" ${g.align==='free'?'selected':''}>Swobodne</option></select></label><label class="f">Moduł od lewej<input type="number" data-gf="x" value="${gx.get(g.id)}" step="1" min="0" ${g.align!=='free'?'disabled':''}></label></div>
     <div class="btns"><button class="small" data-gact="toLeft">⇤ Do lewej</button><button class="small" data-gact="toRight">⇥ Do prawej</button><button class="small" data-gact="dup">Duplikuj grupę</button><button class="small ghost" data-gact="tpl">Zapisz jako wzorzec</button></div>`; }
-function renderPalette(){ $('pal').innerHTML=DB.map((d,i)=>`<button data-db="${i}"><b>${esc(d.code)}</b><span>${esc(d.name||'—')}</span><i>${d.mod} mod${d.prefix?' · '+esc(d.prefix):''}${d.rating?' · '+esc(d.rating):''}${(d.table||'std')!=='std'?' · '+d.table.slice(1)+' pola':''}</i></button>`).join('');
+function renderPalette(){ $('pal').innerHTML=DB.map((d,i)=>`<button data-db="${i}" ${d.kind==='custom'?'style="border-style:dashed"':''}><b>${esc(d.code)}</b><span>${esc(d.name||'—')}</span><i>${d.kind==='custom'? (d.shape==='circle'?'Ø'+d.cw:d.cw+'×'+d.ch)+' mm · element' : d.mod+' mod'}${d.prefix?' · '+esc(d.prefix):''}${d.rating?' · '+esc(d.rating):''}${(d.table||'std')!=='std'?' · '+d.table.slice(1)+' pola':''}</i></button>`).join('');
   const it=selItem&&selItem.type==='cover'?selItem:null; const fi=it&&findItem(it.id); const g=selGrp&&it&&it.row.groups.includes(selGrp)?selGrp:null;
   $('devTarget').textContent= it? `Cel: szafa ${P.cabinets.indexOf(fi.cab)+1}, element ${fi.cab.items.indexOf(it)+1} (${it.w}×${it.h}, ${it.row.mod} mod)` + (g? `, grupa „${g.name||'bez nazwy'}”` : (it.row.groups.length? ', ostatnia grupa' : ' – powstanie grupa do lewej')) : 'Zaznacz maskownicę z wycięciem (zakładka Rozdzielnica lub klik na rysunku).'; }
 function renderMulti(){ const el=$('multi'); const ids=[...multi]; if(ids.length<2){ el.innerHTML='Kliknij aparat na rysunku. <b>Shift+klik</b> zaznacza kilka – wtedy tu ustawisz model, tabelkę lub grupę dla wszystkich naraz.'; return; }
@@ -338,7 +373,7 @@ function migrateBoard(b){ if(b.rows&&!b.cabinets){ const c=newCab(); c.w=(b.fron
   const L=B.label; if(!L.cellH) L.cellH=2.2; if(L.lineW!=null&&L.lwMain==null){ L.lwMain=L.lineW; L.lwDivV=L.lineW; L.lwDivH=L.lineW; } if(L.div!=null&&L.divV==null){ L.divV=L.div; L.divH=L.div; }
   if(!B.cabinets.length) B.cabinets.push(newCab());
   for(const c of B.cabinets){ if(c.plinth==null) c.plinth=0; if(!c.hinge) c.hinge='left'; if(!c.leaves) c.leaves=1; for(const it of c.items) if(it.type==='cover'){ const r=it.row; if(!r.groups){ const groups=[]; let cur=null; for(const d of (r.devices||[])){ const gn=d.group||''; if(!cur||cur.name!==gn){ cur=newGroup(gn,'left'); groups.push(cur); } cur.devices.push(d); } r.groups=groups; delete r.devices; }
-      for(const g of r.groups){ if(g.bot==null) g.bot=''; for(const d of g.devices){ if(!d.table) d.table = d.ncell>1 ? (d.layout==='cols'?'c':'r')+Math.min(4,d.ncell) : 'std'; if(d.rating==null) d.rating=''; } } if(!r.pos) r.pos='block'; } }
+      if(!it.custom) it.custom=[]; for(const g of r.groups){ if(g.bot==null) g.bot=''; for(const d of g.devices){ if(!d.table) d.table = d.ncell>1 ? (d.layout==='cols'?'c':'r')+Math.min(4,d.ncell) : 'std'; if(d.rating==null) d.rating=''; } } if(!r.pos) r.pos='block'; } }
   if(B.db){ delete B.db; } return B; }
 
 /* ===================== Google Drive sync ===================== */
@@ -386,7 +421,7 @@ function readFile(input, cb){ const file=input.files[0]; if(!file) return; const
 
 /* ===================== Label table (horizontal) ===================== */
 let TABLE_ON=false, TABLE_SIG='', tblRange=null, tblAnchor=null, focusSnap=null;
-function tableCols(it){ const cab=findItem(it.id).cab; const g=coverGeometry(cab,it); return {cab,g,cols:g.labels.slice().sort((a,b)=>a.x-b.x)}; }
+function tableCols(it){ const cab=findItem(it.id).cab; const g=coverGeometry(cab,it); const cols=g.labels.slice().sort((a,b)=>a.x-b.x); for(const cu of g.customs.slice().sort((a,b)=>a.cb.x-b.cb.x)) cols.push({dev:cu.el, grp:null, x:cu.cb.x, w:cu.cb.w, m:0, custom:true}); return {cab,g,cols}; }
 function tblFieldRows(){ return ['symbol','name','rating']; }
 function renderTable(){ const wrap=$('tableWrap'); const it=selItem&&selItem.type==='cover'?selItem:null; $('stage').classList.toggle('tbl',TABLE_ON&&!!it); if(!TABLE_ON||!it){ wrap.style.display='none'; TABLE_SIG=''; return; } wrap.style.display='block';
   const {cab,g,cols}=tableCols(it); const sig=it.id+'|'+cols.map(l=>l.dev.id+':'+(l.dev.table||'std')+':'+(l.dev.blank?1:0)).join(',')+'|'+it.row.groups.map(x=>x.id+':'+x.devices.length).join(',');
@@ -398,8 +433,8 @@ function buildTable(cab,it,cols){ const wrap=$('tableWrap'); const ci=P.cabinets
     <button class="small ghost" data-ta="prev">◀ Poprzednia</button><button class="small ghost" data-ta="next">Następna ▶</button><button class="small ghost" data-ta="csvout">Eksport rzędu</button><button class="small ghost" data-ta="csvin">Import rzędu</button><button class="small ghost" data-ta="csvnames">Importuj tylko opisy</button><button class="small ghost icon" data-ta="close" title="Zamknij">×</button>
     <input type="file" id="rowCsvFile" accept=".csv,.txt,.tsv" style="display:none"></div>
     <div style="overflow:auto"><table><colgroup><col style="width:96px">${cols.map(()=>`<col style="width:${W}px">`).join('')}<col style="width:90px"></colgroup>`;
-  h+=`<tr><th class="lab">Poz. · kod</th>${cols.map((l,i)=>`<th class="dev" data-d="${l.dev.id}" title="Zaznacz aparat">${i+1} · ${esc(l.dev.code)}${l.dev.blank?' (zaślepka)':''}${tableCells(l.dev)?' · '+tableCells(l.dev).n+' pola':''}</th>`).join('')}<th style="color:${free<0?'var(--danger)':'var(--ink-2)'}">${free<0?'za dużo o '+(-free):'wolne '+free} mod</th></tr>`;
-  const cell=(l,i,f,idx)=>{ const d=l.dev; if(d.blank) return `<td class="blank" data-d="${d.id}">—</td>`; if(f==='symbol'){ if(tableCells(d)) return `<td class="blank" data-d="${d.id}" title="Tabelka wielopolowa – bez symbolu">bez symbolu</td>`; return `<td data-d="${d.id}"><input data-d="${d.id}" data-f="symbol" data-r="0" data-c="${i}" value="${esc(d.symbol)}" placeholder="auto"></td>`; }
+  h+=`<tr><th class="lab">Poz. · kod</th>${cols.map((l,i)=>`<th class="dev" data-d="${l.dev.id}" title="Zaznacz aparat">${i+1} · ${esc(l.dev.code)}${l.custom?' (element)':''}${l.dev.blank?' (zaślepka)':''}${tableCells(l.dev)?' · '+tableCells(l.dev).n+' pola':''}</th>`).join('')}<th style="color:${free<0?'var(--danger)':'var(--ink-2)'}">${free<0?'za dużo o '+(-free):'wolne '+free} mod</th></tr>`;
+  const cell=(l,i,f,idx)=>{ const d=l.dev; if(d.blank) return `<td class="blank" data-d="${d.id}">—</td>`; if(f==='symbol'){ if(tableCells(d)&&!d.custom) return `<td class="blank" data-d="${d.id}" title="Tabelka wielopolowa – bez symbolu">bez symbolu</td>`; return `<td data-d="${d.id}"><input data-d="${d.id}" data-f="symbol" data-r="0" data-c="${i}" value="${esc(d.symbol)}" placeholder="auto"></td>`; }
     if(f==='name'){ const tc=tableCells(d); if(!tc) return `<td data-d="${d.id}"><input data-d="${d.id}" data-f="name" data-r="1" data-c="${i}" value="${esc(d.name)}" placeholder="nazwa"></td>`; const cells=(d.name||'').split('|'); return `<td data-d="${d.id}"><div class="stack">${Array.from({length:tc.n},(_,k)=>`<input data-d="${d.id}" data-f="cell:${k}" data-r="1" data-c="${i}" data-k="${k}" value="${esc(cells[k]||'')}" placeholder="pole ${k+1}">`).join('')}</div></td>`; }
     if(f==='rating') return `<td data-d="${d.id}"><input data-d="${d.id}" data-f="rating" data-r="2" data-c="${i}" value="${esc(d.rating||'')}" placeholder="model" list="ratings"></td>`;
     if(f==='icon') return `<td data-d="${d.id}"><select data-d="${d.id}" data-f="icon"><option value="">– ikona –</option>${icons.map(x=>`<option value="${x.id}" ${d.icon===x.id?'selected':''}>${esc(x.name)}</option>`).join('')}</select></td>`; };
@@ -407,7 +442,7 @@ function buildTable(cab,it,cols){ const wrap=$('tableWrap'); const ci=P.cabinets
   h+=`<tr><th class="lab">Nazwa / pola</th>${cols.map((l,i)=>cell(l,i,'name')).join('')}</tr>`;
   h+=`<tr><th class="lab">Model</th>${cols.map((l,i)=>cell(l,i,'rating')).join('')}</tr>`;
   // group row: consecutive columns of same group merged
-  let gcells=''; let i=0; while(i<cols.length){ const gr=cols[i].grp; let j=i; while(j+1<cols.length&&cols[j+1].grp===gr) j++; gcells+=`<td colspan="${j-i+1}" data-g="${gr.id}"><div class="pair"><input data-g="${gr.id}" data-f="gname" value="${esc(gr.name)}" placeholder="podpis górny"><input data-g="${gr.id}" data-f="gbot" value="${esc(gr.bot||'')}" placeholder="podpis dolny"></div></td>`; i=j+1; }
+  let gcells=''; let i=0; while(i<cols.length){ const gr=cols[i].grp; let j=i; while(j+1<cols.length&&cols[j+1].grp===gr) j++; gcells+= gr? `<td colspan="${j-i+1}" data-g="${gr.id}"><div class="pair"><input data-g="${gr.id}" data-f="gname" value="${esc(gr.name)}" placeholder="podpis górny"><input data-g="${gr.id}" data-f="gbot" value="${esc(gr.bot||'')}" placeholder="podpis dolny"></div></td>` : `<td colspan="${j-i+1}" class="blank">element niestandardowy</td>`; i=j+1; }
   h+=`<tr><th class="lab">Grupa</th>${gcells}</tr>`;
   h+=`<tr><th class="lab">Ikona</th>${cols.map((l,i)=>cell(l,i,'icon')).join('')}</tr>`;
   h+=`</table></div><div style="padding:4px 8px;font-size:11px;color:var(--ink-2)">Tab / Enter – następny aparat, ↓ ↑ – wiersz niżej/wyżej, Ctrl+V – wklej blok z arkusza (w prawo), Shift+klik – zaznacz zakres, Ctrl+C – kopiuj zakres</div>`;
@@ -457,7 +492,7 @@ $('tplList').addEventListener('click',e=>{ const b=e.target.closest('button[data
   TABLE_SIG=''; change(); });
 function reidKeep(obj, keep){ if(Array.isArray(obj)) obj.forEach(o=>reidKeep(o,keep)); else if(obj&&typeof obj==='object'){ if(obj.id) obj.id=uid(); if(!keep&&obj.auto!==false&&obj.symbol!=null&&obj.code) obj.symbol=''; for(const k in obj) reidKeep(obj[k],keep); } return obj; }
 function saveGroupTemplate(g){ const name=prompt('Nazwa wzorca grupy', g.name||''); if(!name) return; const keep=confirm('Zachować symbole na stałe (OK), czy numerować na nowo po wstawieniu (Anuluj)?'); TEMPLATES.push({id:uid(),name:name.trim(),kind:'group',keepSymbols:keep,data:JSON.parse(JSON.stringify(g)),created:Date.now()}); saveTemplates(); renderTplList(); toast('Zapisano wzorzec'); }
-function saveCoverTemplate(it){ const name=prompt('Nazwa wzorca maskownicy',''); if(!name) return; const keep=confirm('Zachować symbole na stałe (OK), czy numerować na nowo po wstawieniu (Anuluj)?'); TEMPLATES.push({id:uid(),name:name.trim(),kind:'cover',keepSymbols:keep,data:JSON.parse(JSON.stringify({type:'cover',w:it.w,h:it.h,row:it.row})),created:Date.now()}); saveTemplates(); renderTplList(); toast('Zapisano wzorzec'); }
+function saveCoverTemplate(it){ const name=prompt('Nazwa wzorca maskownicy',''); if(!name) return; const keep=confirm('Zachować symbole na stałe (OK), czy numerować na nowo po wstawieniu (Anuluj)?'); TEMPLATES.push({id:uid(),name:name.trim(),kind:'cover',keepSymbols:keep,data:JSON.parse(JSON.stringify({type:'cover',w:it.w,h:it.h,row:it.row,custom:it.custom||[]})),created:Date.now()}); saveTemplates(); renderTplList(); toast('Zapisano wzorzec'); }
 function renderTpl(){ $('tplt').innerHTML=`<tr><th>Nazwa</th><th>Rodzaj</th><th>Zawartość</th><th>Symbole</th><th></th></tr>`+TEMPLATES.map((t,i)=>{ const devs=t.kind==='group'?t.data.devices:rowDevices(t.data.row); return `<tr data-i="${i}"><td><input data-k="name" value="${esc(t.name)}"></td><td style="font-size:12px">${t.kind==='group'?'grupa':'maskownica'}</td><td style="font-size:11px;color:var(--ink-2)">${devs.filter(d=>!d.blank).map(d=>esc(d.code+(d.rating?' '+d.rating:''))).join(', ')} (${tplMod(t)} mod)</td><td><label class="chk" style="margin:0"><input type="checkbox" data-k="keepSymbols" ${t.keepSymbols?'checked':''}> stałe</label></td><td><button class="small ghost icon" data-del="${i}">×</button></td></tr>`; }).join('')||'<tr><td colspan="5" style="color:var(--ink-2)">Brak wzorców – zapisz grupę lub maskownicę przyciskiem „Zapisz jako wzorzec”.</td></tr>'; }
 $('tplt').addEventListener('change',e=>{ const tr=e.target.closest('tr'); const k=e.target.dataset.k; if(!tr||!k) return; const t=TEMPLATES[+tr.dataset.i]; t[k]= k==='keepSymbols'? e.target.checked : e.target.value.trim(); saveTemplates(); renderTplList(); });
 $('tplt').addEventListener('click',e=>{ const b=e.target.closest('button[data-del]'); if(!b) return; if(!confirm('Usunąć wzorzec „'+TEMPLATES[+b.dataset.del].name+'”?')) return; TEMPLATES.splice(+b.dataset.del,1); saveTemplates(); renderTpl(); renderTplList(); });
@@ -504,12 +539,14 @@ $('itemEdit').addEventListener('change',e=>{ const k=e.target.dataset.if; if(!k|
   else if(k==='w'||k==='h') it[k]=Math.max(10,+e.target.value||10);
   else if(k==='nicheY') it.row.nicheY= e.target.value===''?null:+e.target.value;
   else if(k==='pos') it.row.pos=e.target.value;
+  else if(k==='mod') it.row.mod=Math.max(0,Math.round(+e.target.value||0));
   else it.row[k]=Math.max(1,+e.target.value||1);
   change(); });
 // clipboard (item / device)
-async function copySel(){ if(selDev&&!multi.size){ await IDB.set('clip',{kind:'dev',data:selDev}); toast('Skopiowano aparat'); } else if(multi.size){ const list=[...multi].map(id=>findDev(id)).filter(Boolean).map(f=>f.dev); await IDB.set('clip',{kind:'devs',data:list}); toast(`Skopiowano ${list.length} aparatów`); } else if(selItem){ await IDB.set('clip',{kind:'item',data:selItem}); toast('Skopiowano element: '+ITEM_NAMES[selItem.type]); } }
+async function copySel(){ if(selDev&&!multi.size){ await IDB.set('clip',{kind:selDev.custom?'cel':'dev',data:selDev}); toast('Skopiowano aparat'); } else if(multi.size){ const list=[...multi].map(id=>findDev(id)).filter(Boolean).map(f=>f.dev); await IDB.set('clip',{kind:'devs',data:list}); toast(`Skopiowano ${list.length} aparatów`); } else if(selItem){ await IDB.set('clip',{kind:'item',data:selItem}); toast('Skopiowano element: '+ITEM_NAMES[selItem.type]); } }
 async function pasteSel(){ const c=await IDB.get('clip'); if(!c){ toast('Schowek pusty'); return; } snapshot();
   if(c.kind==='item'){ if(!selCab){ toast('Zaznacz szafę'); return; } const it=reid(JSON.parse(JSON.stringify(c.data))); const i=selItem? selCab.items.indexOf(selItem)+1 : selCab.items.length; selCab.items.splice(i,0,it); selItem=it; selGrp=null; selDev=null; }
+  else if(c.kind==='cel'){ const it=selItem&&selItem.type==='cover'?selItem:null; if(!it){ toast('Zaznacz maskownicę'); return; } it.custom=it.custom||[]; const n=reid(JSON.parse(JSON.stringify(c.data))); it.custom.push(n); selDev=n; TABLE_SIG=''; }
   else { const it=selItem&&selItem.type==='cover'?selItem:null; if(!it){ toast('Zaznacz maskownicę'); return; } let g=selGrp&&it.row.groups.includes(selGrp)?selGrp:it.row.groups[it.row.groups.length-1]; if(!g){ g=newGroup('','left'); it.row.groups.push(g); } const list=c.kind==='dev'?[c.data]:c.data; for(const d of list){ const n=reid(JSON.parse(JSON.stringify(d))); g.devices.push(n); selDev=n; } selGrp=g; }
   change(); }
 $('btnCopyItem').onclick=copySel; $('btnPasteItem').onclick=pasteSel;
@@ -529,7 +566,7 @@ $('grpEdit').addEventListener('click',e=>{ const b=e.target.closest('button[data
   if(b.dataset.gact==='tpl'){ history.pop(); saveGroupTemplate(selGrp); return; }
   change(); });
 // palette
-$('pal').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; addDevice(DB[+b.dataset.db]); });
+$('pal').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; const d=DB[+b.dataset.db]; if(d.kind==='custom') addCustom(d); else addDevice(d); });
 // multi
 $('multi').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; const list=[...multi].map(id=>findDev(id)).filter(Boolean);
   if(b.id==='mClear'){ multi.clear(); selDev=null; change(); return; } snapshot();
@@ -537,8 +574,17 @@ $('multi').addEventListener('click',e=>{ const b=e.target.closest('button'); if(
   if(b.id==='mApply'){ const r=$('mRating').value.trim(), t=$('mTable').value; for(const fd of list){ if(r) fd.dev.rating=r; if(t) fd.dev.table=t; } }
   change(); });
 // device editor
+function renderCustomEditor(fd){ const e=$('editor'); const d=fd.dev; const it=fd.item; const allIcons=[...ICONS,...USERICONS]; e.classList.add('on');
+  e.innerHTML=`<div class="row four"><label class="f">Symbol<input data-cf="symbol" value="${esc(d.symbol)}"></label><label class="f">Nazwa (/ = nowa linia)<input data-cf="name" value="${esc(d.name)}"></label><label class="f">Model / prąd<input data-cf="rating" value="${esc(d.rating||'')}"></label><label class="f">Kod<input data-cf="code" value="${esc(d.code)}"></label></div>
+    <div class="row four"><label class="f">Kształt wycięcia<select data-cf="shape"><option value="rect" ${d.shape!=='circle'?'selected':''}>Prostokąt</option><option value="circle" ${d.shape==='circle'?'selected':''}>Okrąg</option></select></label><label class="f">Szerokość / Ø mm<input data-cf="w" type="number" step="0.5" value="${d.w}"></label><label class="f">Wysokość mm<input data-cf="h" type="number" step="0.5" value="${d.h}" ${d.shape==='circle'?'disabled':''}></label><label class="f">&nbsp;<span style="display:flex;gap:4px"><button class="small" data-cact="cx" title="Wyśrodkuj w poziomie">↔ środek</button><button class="small" data-cact="cy" title="Wyśrodkuj w pionie">↕ środek</button></span></label></div>
+    <div class="row four"><label class="f">X od lewej mm (puste = środek)<input data-cf="x" type="number" step="1" value="${d.x==null?'':d.x}" placeholder="środek"></label><label class="f">Y od góry mm (puste = środek)<input data-cf="y" type="number" step="1" value="${d.y==null?'':d.y}" placeholder="środek"></label>
+      <label class="f">Ramka opisu<select data-cf="labelPos"><option value="above" ${(d.labelPos||'above')==='above'?'selected':''}>Nad elementem</option><option value="below" ${d.labelPos==='below'?'selected':''}>Pod elementem</option><option value="left" ${d.labelPos==='left'?'selected':''}>Po lewej</option><option value="right" ${d.labelPos==='right'?'selected':''}>Po prawej</option><option value="none" ${d.labelPos==='none'?'selected':''}>Bez ramki</option></select></label><label class="f">Szer. ramki mm (puste = jak element)<input data-cf="labelW" type="number" step="1" value="${d.labelW||''}" placeholder="auto"></label></div>
+    <div class="row four"><label class="f">Otwory mocujące<select data-cf="holesN"><option value="0" ${!(d.holes&&d.holes.n)?'selected':''}>Brak</option><option value="4" ${d.holes&&d.holes.n>=4?'selected':''}>4 (rozstaw)</option></select></label><label class="f">Rozstaw X mm<input data-cf="holesDx" type="number" step="0.5" value="${d.holes?d.holes.dx:0}"></label><label class="f">Rozstaw Y mm<input data-cf="holesDy" type="number" step="0.5" value="${d.holes?d.holes.dy:0}"></label><label class="f">Ø otworu mm<input data-cf="holesD" type="number" step="0.5" value="${d.holes?d.holes.d:5}"></label></div>
+    <div class="row four" style="grid-template-columns:auto 1.4fr 1.2fr .8fr;align-items:end"><span style="color:var(--ink);height:34px">${d.icon?iconSvgPreview(d.icon,34):''}</span><label class="f">Symbol graficzny<select data-cf="icon"><option value="">– brak –</option>${allIcons.map(i=>`<option value="${i.id}" ${d.icon===i.id?'selected':''}>${esc(i.name)}</option>`).join('')}</select></label><label class="f">Położenie ikony<select data-cf="iconPos">${[['left','po lewej od nazwy'],['right','po prawej'],['replace','zamiast nazwy']].map(([v,n])=>`<option value="${v}" ${(d.iconPos||'left')===v?'selected':''}>${n}</option>`).join('')}</select></label><label class="f">Odstęp ramki mm<input data-cf="labelGap" type="number" step="0.5" value="${d.labelGap==null?2:d.labelGap}"></label></div>
+    <div class="btns"><span style="font-size:12px;color:var(--ink-2);align-self:center">Element niestandardowy · szafa ${P.cabinets.indexOf(fd.cab)+1} / el. ${fd.cab.items.indexOf(it)+1}</span><label class="chk" style="margin:0"><input type="checkbox" id="autoSymC" ${d.auto!==false?'checked':''}> numeracja auto</label><span style="flex:1"></span><button class="small" data-cact="dup">Duplikuj</button><button class="small danger" data-cact="del">Usuń</button></div>`; }
 function renderEditor(){
   const e=$('editor'); const fd=selDev&&findDev(selDev.id); if(!fd){ e.classList.remove('on'); e.innerHTML=''; return; }
+  if(fd.custom){ renderCustomEditor(fd); return; }
   const d=fd.dev; e.classList.add('on'); const tc=tableCells(d); const cells=(d.name||'').split('|');
   const opt=Object.entries(TABLES).map(([k,n])=>`<option value="${k}" ${(d.table||'std')===k?'selected':''}>${n}</option>`).join('');
   const gopt=fd.row.groups.map((g,i)=>`<option value="${g.id}" ${g===fd.grp?'selected':''}>${i+1}. ${esc(g.name||'(bez nazwy)')}</option>`).join('');
@@ -555,6 +601,7 @@ function renderEditor(){
     <datalist id="ratings">${['B6','B10','B13','B16','B20','B25','B32','C6','C10','C16','C20','C25','C32','C40','C63','D16','D32','25A 30mA','40A 30mA','63A 30mA','40A 300mA'].map(r=>`<option value="${r}">`).join('')}</datalist>`;
   e.innerHTML=h; }
 $('editor').addEventListener('change',e=>{ const fd=selDev&&findDev(selDev.id); if(!fd) return; const d=fd.dev; snapshot(); const t=e.target;
+  if(fd.custom){ const k=t.dataset.cf; if(t.id==='autoSymC') d.auto=t.checked; else if(k==='x'||k==='y'){ d[k]= t.value===''? null : +t.value; } else if(k==='w'){ d.w=Math.max(1,+t.value||1); if(d.shape==='circle') d.h=d.w; } else if(k==='h') d.h=Math.max(1,+t.value||1); else if(k==='shape'){ d.shape=t.value; if(d.shape==='circle') d.h=d.w; } else if(k==='labelW'||k==='labelGap'){ d[k]= t.value===''? null : +t.value; } else if(k==='holesN'){ d.holes=d.holes||{dx:0,dy:0,d:5}; d.holes.n=+t.value; } else if(k==='holesDx'||k==='holesDy'||k==='holesD'){ d.holes=d.holes||{n:0}; d.holes[k==='holesDx'?'dx':k==='holesDy'?'dy':'d']=+t.value||0; } else if(k==='symbol'){ d.symbol=t.value; d.auto=false; } else if(k) d[k]=t.value; TABLE_SIG=''; change(); return; }
   if(t.id==='autoSym') d.auto=t.checked;
   else if(t.dataset.cell!=null){ const tc=tableCells(d); const n=tc?tc.n:1; const cells=(d.name||'').split('|'); while(cells.length<n) cells.push(''); cells.length=n; cells[+t.dataset.cell]=t.value; d.name=cells.join('|'); }
   else { const k=t.dataset.df; if(k==='mod') d.mod=+t.value||1; else if(k==='symH'||k==='nameH'||k==='cellH'||k==='iconScale') d[k]=t.value===''?null:+t.value;
@@ -562,17 +609,19 @@ $('editor').addEventListener('change',e=>{ const fd=selDev&&findDev(selDev.id); 
     else if(k==='grp'){ const g=fd.row.groups.find(x=>x.id===t.value); if(g&&g!==fd.grp){ fd.grp.devices.splice(fd.idx,1); g.devices.push(d); selGrp=g; } }
     else if(k){ d[k]=t.value; if(k==='symbol') d.auto=false; } }
   change(); });
-$('editor').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; const fd=selDev&&findDev(selDev.id); if(!fd) return; snapshot(); const {grp,idx,dev}=fd; const arr=grp.devices;
+$('editor').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; const fd=selDev&&findDev(selDev.id); if(!fd) return; snapshot();
+  if(fd.custom){ const a=b.dataset.cact; const arr=fd.item.custom; if(a==='del'){ arr.splice(fd.idx,1); selDev=null; } else if(a==='dup'){ const c=reid(JSON.parse(JSON.stringify(fd.dev))); c.x=(fd.dev.x==null? (fd.item.w-fd.dev.w)/2 : fd.dev.x)+fd.dev.w+10; arr.splice(fd.idx+1,0,c); selDev=c; } else if(a==='cx') fd.dev.x=null; else if(a==='cy') fd.dev.y=null; TABLE_SIG=''; change(); return; }
+  const {grp,idx,dev}=fd; const arr=grp.devices;
   if(b.dataset.act==='del'){ arr.splice(idx,1); selDev=null; }
   if(b.dataset.act==='left'&&idx>0) arr.splice(idx-1,0,arr.splice(idx,1)[0]);
   if(b.dataset.act==='right'&&idx<arr.length-1) arr.splice(idx+1,0,arr.splice(idx,1)[0]);
   if(b.dataset.act==='dup'){ const c=reid(JSON.parse(JSON.stringify(dev))); arr.splice(idx+1,0,c); selDev=c; }
   change(); });
 document.addEventListener('keydown',e=>{ if(e.target.matches('input,textarea,select')) return; const fd=selDev&&findDev(selDev.id);
-  if(e.key==='Delete'||e.key==='Backspace'){ if(multi.size){ snapshot(); for(const id of multi){ const f2=findDev(id); if(f2) f2.grp.devices.splice(f2.grp.devices.indexOf(f2.dev),1); } multi.clear(); selDev=null; change(); } else if(fd){ snapshot(); fd.grp.devices.splice(fd.idx,1); selDev=null; change(); } }
+  if(e.key==='Delete'||e.key==='Backspace'){ if(multi.size){ snapshot(); for(const id of multi){ const f2=findDev(id); if(f2&&f2.grp) f2.grp.devices.splice(f2.grp.devices.indexOf(f2.dev),1); } multi.clear(); selDev=null; change(); } else if(fd){ snapshot(); if(fd.custom) fd.item.custom.splice(fd.idx,1); else fd.grp.devices.splice(fd.idx,1); selDev=null; change(); } }
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'){ e.preventDefault(); undo(); } if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='y'){ e.preventDefault(); redo(); }
   if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='c'){ copySel(); } if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='v'){ pasteSel(); }
-  if(fd&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){ const arr=fd.grp.devices; const i=fd.idx; if(e.key==='ArrowLeft'&&i>0){ snapshot(); arr.splice(i-1,0,arr.splice(i,1)[0]); change(); } if(e.key==='ArrowRight'&&i<arr.length-1){ snapshot(); arr.splice(i+1,0,arr.splice(i,1)[0]); change(); } e.preventDefault(); } });
+  if(fd&&!fd.custom&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){ const arr=fd.grp.devices; const i=fd.idx; if(e.key==='ArrowLeft'&&i>0){ snapshot(); arr.splice(i-1,0,arr.splice(i,1)[0]); change(); } if(e.key==='ArrowRight'&&i<arr.length-1){ snapshot(); arr.splice(i+1,0,arr.splice(i,1)[0]); change(); } e.preventDefault(); } });
 function reselect(){ selCab=P.cabinets.find(c=>selCab&&c.id===selCab.id)||P.cabinets[0]||null; const fi=selItem&&findItem(selItem.id); selItem=fi?fi.item:null; if(fi) selCab=fi.cab; const fg=selGrp&&findGrp(selGrp.id); selGrp=fg?fg.grp:null; const fd=selDev&&findDev(selDev.id); selDev=fd?fd.dev:null; multi=new Set([...multi].filter(id=>findDev(id))); }
 function undo(){ const s=history.pop(); if(!s){toast('Nic do cofnięcia');return;} future.push(JSON.stringify(P)); P=JSON.parse(s); reselect(); syncInputs(); change(); }
 function redo(){ const s=future.pop(); if(!s){toast('Nic do ponowienia');return;} history.push(JSON.stringify(P)); P=JSON.parse(s); reselect(); syncInputs(); change(); }
@@ -589,9 +638,10 @@ function svgPoint(ev){ const svg=$('svg'); const pt=svg.createSVGPoint(); pt.x=e
 $('stage').addEventListener('pointerdown',ev=>{
   if(!ev.target.closest('#svg')) return; pointers.set(ev.pointerId,[ev.clientX,ev.clientY]);
   if(pointers.size===2){ drag=null; $('ghost').innerHTML=''; const [a,b]=[...pointers.values()]; pinch={d:Math.hypot(a[0]-b[0],a[1]-b[1]), k:ZOOM.k}; return; }
-  const dg=ev.target.closest('.dev'), gg=ev.target.closest('.grp');
+  const dg=ev.target.closest('.dev'), gg=ev.target.closest('.grp'), cg2=ev.target.closest('.cel');
   const base={start:[ev.clientX,ev.clientY], moved:false, target:null, shift:ev.shiftKey};
-  if(dg){ const fd=findDev(dg.dataset.dev); if(fd) drag=Object.assign(base,{kind:'dev',dev:fd.dev}); }
+  if(cg2){ const fd=findDev(cg2.dataset.cel); if(fd){ const box=itemBox(fd.cab,fd.item); const cb=customBox(box,fd.dev); const [x,y]=svgPoint(ev); drag=Object.assign(base,{kind:'cel',dev:fd.dev,item:fd.item,cab:fd.cab,box,ox:x-cb.x,oy:y-cb.y}); } }
+  else if(dg){ const fd=findDev(dg.dataset.dev); if(fd) drag=Object.assign(base,{kind:'dev',dev:fd.dev}); }
   else if(gg){ const fg=findGrp(gg.dataset.grp); if(fg){ const g=coverGeometry(fg.cab,fg.item); const gi=g.groups.find(x=>x.grp===fg.grp); const [x]=svgPoint(ev); drag=Object.assign(base,{kind:'grp',grp:fg.grp,item:fg.item,cab:fg.cab,g,gi,offM:(x-gi.x)/P.pitch}); } }
   else drag=Object.assign(base,{kind:'pan', el:ev.target, cx:ZOOM.cx, cy:ZOOM.cy});
   $('svg').setPointerCapture(ev.pointerId); ev.preventDefault();
@@ -602,6 +652,8 @@ $('stage').addEventListener('pointermove',ev=>{
   if(!drag) return; if(!drag.moved&&Math.hypot(ev.clientX-drag.start[0],ev.clientY-drag.start[1])<4) return; drag.moved=true;
   if(drag.kind==='pan'){ const svg=$('svg'); const r=svg.getBoundingClientRect(); const v=currentViewBox(); ZOOM.cx=drag.cx-(ev.clientX-drag.start[0])*v.w/r.width; ZOOM.cy=drag.cy-(ev.clientY-drag.start[1])*v.h/r.height; clampZoom(); applyViewBox(); return; }
   const [x,y]=svgPoint(ev);
+  if(drag.kind==='cel'){ const el=drag.dev, box=drag.box; let nx2=x-drag.ox-box.x, ny2=y-drag.oy-box.y; const cxm=(box.w-el.w)/2, cym=(box.h-el.h)/2; nx2=Math.round(nx2/5)*5; ny2=Math.round(ny2/5)*5; const snapX=Math.abs(nx2-cxm)<=6, snapY=Math.abs(ny2-cym)<=6; nx2=Math.max(0,Math.min(box.w-el.w,nx2)); ny2=Math.max(0,Math.min(box.h-el.h,ny2)); drag.target={x:snapX?null:nx2, y:snapY?null:ny2};
+    const gx2=box.x+(snapX?cxm:nx2), gy2=box.y+(snapY?cym:ny2); $('ghost').innerHTML=`<rect class="ghost" x="${gx2}" y="${gy2}" width="${el.w}" height="${el.h}"/>${snapX?`<line x1="${box.x+box.w/2}" y1="${box.y}" x2="${box.x+box.w/2}" y2="${box.y+box.h}" stroke="var(--sel)" stroke-width=".5" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>`:''}${snapY?`<line x1="${box.x}" y1="${box.y+box.h/2}" x2="${box.x+box.w}" y2="${box.y+box.h/2}" stroke="var(--sel)" stroke-width=".5" stroke-dasharray="3 2" vector-effect="non-scaling-stroke"/>`:''}`; return; }
   if(drag.kind==='grp'){ const r=drag.item.row; const gm=groupMod(drag.grp); let m=Math.round((x-drag.g.nx)/P.pitch-drag.offM); const [lo,hi]=freeRange(r,drag.grp); const snap= m<=lo+0.5?'left': m>=hi-0.5?'right':null; m=Math.max(lo,Math.min(hi,m)); drag.target={m, snap};
     $('ghost').innerHTML=`<rect class="ghost" x="${drag.g.nx+m*P.pitch}" y="${drag.g.labTop}" width="${gm*P.pitch}" height="${P.label.h+P.label.gap+r.nicheH}"/>`; return; }
   let best=null;
@@ -619,6 +671,7 @@ function endPointer(ev){
       if(ig){ const fi=findItem(ig.dataset.item); if(fi){ selItem=fi.item; selCab=fi.cab; selGrp=null; selDev=null; multi.clear(); change(); } }
       else if(cg){ const c=P.cabinets.find(x=>x.id===cg.dataset.cab); if(c){ selCab=c; selItem=null; selGrp=null; selDev=null; multi.clear(); change(); } } }
     return; }
+  if(d.kind==='cel'){ if(!d.moved){ selDev=d.dev; selItem=d.item; selCab=d.cab; selGrp=null; multi.clear(); change(); return; } if(d.target){ snapshot(); d.dev.x=d.target.x; d.dev.y=d.target.y; selDev=d.dev; selItem=d.item; selCab=d.cab; change(); } return; }
   if(d.kind==='grp'){ if(!d.moved){ selGrp=d.grp; selItem=d.item; selCab=d.cab; selDev=null; change(); return; } if(d.target){ snapshot(); const gs=d.item.row.groups; const i=gs.indexOf(d.grp);
       if(d.target.snap==='left'){ d.grp.align='left'; gs.splice(i,1); gs.unshift(d.grp); } else if(d.target.snap==='right'){ d.grp.align='right'; gs.splice(i,1); gs.push(d.grp); } else { d.grp.align='free'; d.grp.x=d.target.m; }
       selGrp=d.grp; selItem=d.item; selCab=d.cab; change(); } return; }
@@ -668,8 +721,8 @@ $('orderDetail').addEventListener('click',async e=>{ const el=e.target.closest('
 $('btnLib').onclick=()=>{ $('mLib').classList.add('on'); renderDb(); renderEnc(); renderFonts(); renderIconsLib(); renderTpl(); };
 $('libTabs').addEventListener('click',e=>{ const b=e.target.closest('button'); if(!b) return; document.querySelectorAll('#libTabs button').forEach(x=>x.classList.toggle('on',x===b)); for(const k of ['dev','enc','fonts','icons','tpl']) $('lib'+k.charAt(0).toUpperCase()+k.slice(1)).style.display=b.dataset.l===k?'block':'none'; });
 function renderDb(){ const opt=v=>Object.entries(TABLES).map(([k,n])=>`<option value="${k}" ${(v||'std')===k?'selected':''}>${n}</option>`).join('');
-  $('dbt').innerHTML=`<tr><th>Kod</th><th>Nazwa</th><th>Mod.</th><th>Pref.</th><th>Model</th><th>Tabelka</th><th></th></tr>`+DB.map((d,i)=>`<tr data-i="${i}"><td><input data-k="code" value="${esc(d.code)}" style="width:80px"></td><td><input data-k="name" value="${esc(d.name)}"></td><td class="n"><input data-k="mod" type="number" step="0.5" value="${d.mod}"></td><td class="n"><input data-k="prefix" value="${esc(d.prefix)}"></td><td><input data-k="rating" value="${esc(d.rating||'')}" style="width:90px"></td><td><select data-k="table" style="width:130px">${opt(d.table)}</select></td><td><button class="small ghost icon" data-del="${i}">×</button></td></tr>`).join(''); }
-$('dbt').addEventListener('change',e=>{ const tr=e.target.closest('tr'); const k=e.target.dataset.k; if(!tr||!k) return; const d=DB[+tr.dataset.i]; d[k]= k==='mod'? +e.target.value : e.target.value.trim(); SETTINGS.libUpdated=Date.now(); renderPalette(); saveLibrary(); });
+  $('dbt').innerHTML=`<tr><th>Kod</th><th>Nazwa</th><th>Rodzaj</th><th>Mod. / wycięcie</th><th>Pref.</th><th>Model</th><th>Tabelka</th><th></th></tr>`+DB.map((d,i)=>`<tr data-i="${i}"><td><input data-k="code" value="${esc(d.code)}" style="width:72px"></td><td><input data-k="name" value="${esc(d.name)}"></td><td><select data-k="kind" style="width:100px"><option value="" ${d.kind!=='custom'?'selected':''}>modułowy</option><option value="custom" ${d.kind==='custom'?'selected':''}>element</option></select></td><td>${d.kind==='custom'?`<span style="display:flex;gap:2px"><select data-k="shape" style="width:58px"><option value="rect" ${d.shape!=='circle'?'selected':''}>▭</option><option value="circle" ${d.shape==='circle'?'selected':''}>○</option></select><input data-k="cw" type="number" step="0.5" value="${d.cw||92}" style="width:58px" title="szerokość / Ø"><input data-k="ch" type="number" step="0.5" value="${d.ch||92}" style="width:58px" title="wysokość"></span>`:`<input data-k="mod" type="number" step="0.5" value="${d.mod}" style="width:58px">`}</td><td class="n"><input data-k="prefix" value="${esc(d.prefix)}"></td><td><input data-k="rating" value="${esc(d.rating||'')}" style="width:80px"></td><td><select data-k="table" style="width:120px">${opt(d.table)}</select></td><td><button class="small ghost icon" data-del="${i}">×</button></td></tr>`).join(''); }
+$('dbt').addEventListener('change',e=>{ const tr=e.target.closest('tr'); const k=e.target.dataset.k; if(!tr||!k) return; const d=DB[+tr.dataset.i]; if(k==='mod'||k==='cw'||k==='ch') d[k]=+e.target.value; else if(k==='kind'){ d.kind=e.target.value||undefined; if(d.kind==='custom'){ d.mod=0; d.shape=d.shape||'rect'; d.cw=d.cw||92; d.ch=d.ch||92; } else if(!d.mod) d.mod=1; renderDb(); } else d[k]=e.target.value.trim(); SETTINGS.libUpdated=Date.now(); renderPalette(); saveLibrary(); });
 $('dbt').addEventListener('click',e=>{ const b=e.target.closest('button[data-del]'); if(!b) return; DB.splice(+b.dataset.del,1); SETTINGS.libUpdated=Date.now(); renderDb(); renderPalette(); saveLibrary(); });
 $('btnAddDb').onclick=()=>{ DB.push({code:'NOWY',name:'Nazwa',mod:1,prefix:'F',table:'std',rating:''}); SETTINGS.libUpdated=Date.now(); renderDb(); renderPalette(); saveLibrary(); };
 $('btnResetDb').onclick=()=>{ if(!confirm('Przywrócić domyślną bazę aparatów?')) return; DB=JSON.parse(JSON.stringify(DEFAULT_DB)); SETTINGS.libUpdated=Date.now(); renderDb(); renderPalette(); saveLibrary(); };
@@ -709,8 +762,9 @@ $('gAuto').addEventListener('change',async e=>{ SETTINGS.gAuto=e.target.checked;
 $('gClientId').addEventListener('change',async e=>{ SETTINGS.gClientId=e.target.value.trim(); await IDB.set('settings',SETTINGS); });
 // check
 $('btnCheck').onclick=()=>{ const iss=[]; FIT_LOG=[]; for(const {cab,item} of coverItems()) coverGeometry(cab,item); const shr=FIT_LOG.filter(x=>x.k<0.85); FIT_LOG=null; for(const x of shr.slice(0,40)) iss.push(['warn',`Tekst „${x.text}” zmniejszony do ${Math.round(x.k*100)}% (${(x.capH*x.k).toFixed(1)} mm zamiast ${x.capH} mm) – skróć nazwę lub powiększ ramkę`]); P.cabinets.forEach((c,ci)=>{ const used=c.items.reduce((a,i)=>a+i.h,0); if(used>c.h) iss.push(['err',`Szafa ${ci+1}: elementy ${used} mm > wysokość szafy ${c.h} mm`]); if(used<c.h) iss.push(['info',`Szafa ${ci+1}: ${c.h-used} mm wolnego miejsca`]);
-    c.items.forEach((it,ii)=>{ if(it.w>c.w) iss.push(['err',`Szafa ${ci+1}, element ${ii+1}: szerszy (${it.w}) niż szafa (${c.w})`]); if(it.type!=='cover') return; const r=it.row; const nw=r.mod*P.pitch; if(nw>it.w) iss.push(['err',`Szafa ${ci+1}, maskownica ${ii+1}: wycięcie ${nw} mm szersze niż maskownica ${it.w} mm`]);
-      const g=coverGeometry(c,it); if(g.labTop-g.topSpace<g.box.y||g.nicheTop+r.nicheH+g.botSpace>g.box.y+g.box.h) iss.push(['err',`Szafa ${ci+1}, maskownica ${ii+1}: opisy/wycięcie wychodzą poza maskownicę (za mała wysokość)`]);
+    c.items.forEach((it,ii)=>{ if(it.w>c.w) iss.push(['err',`Szafa ${ci+1}, element ${ii+1}: szerszy (${it.w}) niż szafa (${c.w})`]); if(it.type!=='cover') return; const r=it.row; const nw=r.mod*P.pitch; if(r.mod>0&&nw>it.w) iss.push(['err',`Szafa ${ci+1}, maskownica ${ii+1}: wycięcie ${nw} mm szersze niż maskownica ${it.w} mm`]);
+      const g=coverGeometry(c,it); if(r.mod>0&&(g.labTop-g.topSpace<g.box.y||g.nicheTop+r.nicheH+g.botSpace>g.box.y+g.box.h)) iss.push(['err',`Szafa ${ci+1}, maskownica ${ii+1}: opisy/wycięcie wychodzą poza maskownicę (za mała wysokość)`]);
+      for(const cu of g.customs){ const b2=g.box, cb=cu.cb; if(cb.x<b2.x||cb.y<b2.y||cb.x+cb.w>b2.x+b2.w||cb.y+cb.h>b2.y+b2.h) iss.push(['err',`Szafa ${ci+1}, maskownica ${ii+1}: element ${cu.el.symbol||cu.el.code} wychodzi poza maskownicę`]); if(cu.lb&&(cu.lb.y<b2.y||cu.lb.y+cu.lb.h>b2.y+b2.h||cu.lb.x<b2.x||cu.lb.x+cu.lb.w>b2.x+b2.w)) iss.push(['warn',`Szafa ${ci+1}, maskownica ${ii+1}: ramka opisu elementu ${cu.el.symbol||cu.el.code} wychodzi poza maskownicę`]); if(r.mod>0&&cb.x<g.nx+g.nicheW&&cb.x+cb.w>g.nx&&cb.y<g.nicheTop+r.nicheH&&cb.y+cb.h>g.nicheTop) iss.push(['err',`Szafa ${ci+1}, maskownica ${ii+1}: element ${cu.el.symbol||cu.el.code} nachodzi na wycięcie modułowe`]); if(!cu.el.rating) iss.push(['warn',`${cu.el.symbol||cu.el.code} (${cu.el.name||''}): brak modelu/prądu`]); }
       const used=rowDevices(r).reduce((a,d)=>a+d.mod,0); if(used>r.mod) iss.push(['err',`Szafa ${ci+1}, maskownica ${ii+1}: ${used} modułów > ${r.mod} w wycięciu`]); const gx=groupX(r); for(const gr of r.groups){ if(!gr.devices.length) iss.push(['warn',`Szafa ${ci+1}, maskownica ${ii+1}: pusta grupa „${gr.name||'bez nazwy'}”`]); for(const d of gr.devices){ if(d.blank) continue; if(!d.name&&(d.table||'std')==='std') iss.push(['warn',`${d.symbol||d.code}: brak nazwy`]); if(!d.rating) iss.push(['warn',`${d.symbol||d.code} (${d.name||''}): brak modelu/prądu`]); } } }); });
   const syms={}; for(const {item} of coverItems()) for(const d of rowDevices(item.row)) if(d.symbol){ (syms[d.symbol]=syms[d.symbol]||[]).push(d); } for(const [s,l] of Object.entries(syms)) if(l.length>1) iss.push(['err',`Symbol ${s} użyty ${l.length} razy`]);
   $('issues').innerHTML= iss.length? iss.map(([t,m])=>`<div class="it"><span class="tag" style="background:${t==='err'?'#f8d7d7':t==='warn'?'#fff1c2':'var(--panel)'}">${t==='err'?'błąd':t==='warn'?'uwaga':'info'}</span><span class="grow" style="white-space:normal">${esc(m)}</span></div>`).join('') : '<div class="it">Brak uwag – projekt wygląda poprawnie.</div>'; $('mCheck').classList.add('on'); };
@@ -738,6 +792,10 @@ APARAT; kod; symbol; nazwa; grupa; tabelka; moduły; wys.symbolu; wys.nazwy; mod
       tabelka: std | 2 | 3 | 4 | 2obok | 3obok; model np. B16, C32, 40A 30mA
       symbol graficzny: id z biblioteki (gniazdo, gniazdo3f, zarowka, lodowka, piekarnik, plyta, zmywarka, pralka, bojler, pompaciepla, pv,
       wentylator, pompa, silnik, grzejnik, klima, brama, ev, dzwonek, pc, kociol, kuchenka); położenie: left | right | replace | cell1..cell4
+ELEMENT; kod; symbol; nazwa; model; kształt; szer/Ø; wys; X; Y; ramka; szer.ramki; otwory; rozstawX; rozstawY; Ø otworu; ikona; poz.ikony
+      element niestandardowy w bieżącej maskownicy (wyłącznik główny, ATS, analizator, przycisk…): kształt prostokat | okrag;
+      X, Y w mm od lewego górnego rogu maskownicy (puste = wyśrodkowany); ramka opisu: nad | pod | lewa | prawa | brak; otwory: 0 | 4
+      np. ELEMENT; WG; ; Wyłącznik główny; 250A; prostokat; 92; 92; ; ; nad; 120; 4; 70; 70; 5
 BAZA; kod; nazwa; moduły; prefiks; tabelka; model [; zaslepka]
 RAMKA; wys.ramki; odstęp; wys.symbolu; wys.nazwy; grubość obrysu; zaokrąglenie; podział %; grubość pion; grubość poziom
 
@@ -747,9 +805,11 @@ PROJEKT; RG hala; RG; A
 ZLECENIE; 2026/09/017; Firma XYZ; Hala produkcyjna; Piła
 SZAFA; 750; 2000; 100
 PUSTE; 250
+MASKOWNICA; 600; 300; 0; 45; blok
+ELEMENT; WG; ; Wyłącznik główny; 250A; prostokat; 92; 92; ; ; nad; 120; 4; 70; 70; 5
 MASKOWNICA; 600; 200; 24; 45; blok
 GRUPA; ; lewa
-APARAT; FR304; ; Rozłącznik główny; ; ; ; ; ; 63A
+APARAT; FR304; ; Rozłącznik; ; ; ; ; ; 63A
 APARAT; SPD; ; Ochronnik/przepięć; ; ; ; ; ; T1+T2
 GRUPA; Zas. gwarantowane PC + Sterowanie; lewa; Pomiar A
 APARAT; P304; ; Zas. gwarantowane; ; ; ; ; ; 40A 30mA
@@ -792,11 +852,13 @@ function parseCsv(text){
       case 'PLYTA': case 'PLATE': needCab(); cab.items.push({id:uid(),type:'plate',w:num(a[0],cab.w),h:num(a[1],400)}); cover=null; grp=null; break;
       case 'ZASLEPKA': case 'BLANK': needCab(); cab.items.push({id:uid(),type:'blank',w:num(a[0],cab.w),h:num(a[1],150)}); cover=null; grp=null; break;
       case 'MASKOWNICA': case 'COVER': { needCab(); const posRaw=norm(a[4]); let pos='block', nicheY=null; if(posRaw==='SRODEK'||posRaw==='CENTER') pos='niche'; else if(posRaw&&posRaw!=='BLOK'&&posRaw!=='BLOCK'){ const n=num(a[4],null); if(n!=null){ pos='top'; nicheY=n; } }
-        cover={id:uid(),type:'cover',w:num(a[0],cab.w),h:num(a[1],150),row:{mod:Math.max(1,Math.round(num(a[2],24))),nicheH:num(a[3],45),nicheY,pos,groups:[]}}; cab.items.push(cover); grp=null; break; }
+        cover={id:uid(),type:'cover',w:num(a[0],cab.w),h:num(a[1],150),custom:[],row:{mod:Math.max(0,Math.round(num(a[2],24))),nicheH:num(a[3],45),nicheY,pos,groups:[]}}; cab.items.push(cover); grp=null; break; }
       case 'GRUPA': case 'GROUP': { if(!cover){ out.warn.push(`wiersz ${ln+1}: GRUPA bez MASKOWNICA – pominięto`); return; } grp=Object.assign(newGroup(a[0]||'','left'),parseAlign(a[1])); grp.bot=a[2]||''; cover.row.groups.push(grp); break; }
       case 'APARAT': case 'DEVICE': { if(!cover){ out.warn.push(`wiersz ${ln+1}: APARAT bez MASKOWNICA – pominięto`); return; }
         const gname=a[3]||''; if(!grp || (gname && grp.name!==gname)){ grp=newGroup(gname,'left'); cover.row.groups.push(grp); }
         const code=a[0]||'?'; out.db.push({code}); grp.devices.push({id:uid(),code,symbol:a[1]||'',auto:!(a[1]||'').trim(),name:a[2]||'',tableCsv:tableCode(a[4]),modCsv:num(a[5],null),symH:num(a[6],null),nameH:num(a[7],null),rating:a[8]||'',icon:a[9]||'',iconPos:a[10]||''}); break; }
+      case 'ELEMENT': case 'CUSTOM': { if(!cover){ out.warn.push(`wiersz ${ln+1}: ELEMENT bez MASKOWNICA – pominięto`); return; } cover.custom=cover.custom||[]; const shape=norm(a[4])==='OKRAG'||norm(a[4])==='CIRCLE'||norm(a[4])==='O'?'circle':'rect';
+        cover.custom.push({id:uid(),code:a[0]||'?',symbol:a[1]||'',auto:!(a[1]||'').trim(),name:a[2]||'',rating:a[3]||'',shape,w:num(a[5],92),h:shape==='circle'?num(a[5],92):num(a[6],92),x:num(a[7],null),y:num(a[8],null),labelPos:({NAD:'above',ABOVE:'above',POD:'below',BELOW:'below',LEWA:'left',LEFT:'left',PRAWA:'right',RIGHT:'right',BRAK:'none',NONE:'none'})[norm(a[9])]||'above',labelW:num(a[10],null),holes:{n:num(a[11],0),dx:num(a[12],0),dy:num(a[13],0),d:num(a[14],5)},icon:a[15]||'',iconPos:a[16]||'left',mod:0,prefix:'',table:'std',labelGap:2,custom:true}); break; }
       case 'BAZA': case 'DB': out.db.push({code:a[0]||'?',name:a[1]||'',mod:num(a[2],1),prefix:a[3]||'',table:tableCode(a[4])||'std',rating:a[5]||'',blank:/^(1|TAK|YES|TRUE|ZASLEPKA)$/.test(norm(a[6]))||norm(a[4])==='ZASLEPKA',def:true}); break;
       case 'RAMKA': case 'FRAME': out.label={h:num(a[0],null),gap:num(a[1],null),symH:num(a[2],null),nameH:num(a[3],null),lwMain:num(a[4],null),frameR:num(a[5],null),split:num(a[6],null),lwDivV:num(a[7],null),lwDivH:num(a[8],null)}; break;
       default: out.warn.push(`wiersz ${ln+1}: nieznany typ „${cells[0]}” – pominięto`);
@@ -811,20 +873,20 @@ function applyCsv(parsed, replace){
   const added=[];
   for(const cab of parsed.cabinets){ for(const it of cab.items){ if(it.type!=='cover') continue; for(const g of it.row.groups) g.devices=g.devices.map(d=>{ let b=DB.find(x=>norm(x.code)===norm(d.code));
       if(!b){ b={code:d.code,name:'',mod:d.modCsv||1,prefix:'F',table:d.tableCsv||'std',rating:''}; DB.push(b); added.push(d.code); SETTINGS.libUpdated=Date.now(); }
-      return {id:d.id,code:b.code,name:b.blank?'':d.name,mod:d.modCsv||b.mod,prefix:b.prefix,blank:!!b.blank,auto:d.auto,symbol:d.symbol,table:d.tableCsv||b.table||'std',rating:d.rating||b.rating||'',symH:d.symH,nameH:d.nameH,icon:d.icon&&iconById(d.icon)?d.icon:'',iconPos:d.iconPos||'left'}; }); } P.cabinets.push(cab); }
+      return {id:d.id,code:b.code,name:b.blank?'':d.name,mod:d.modCsv||b.mod,prefix:b.prefix,blank:!!b.blank,auto:d.auto,symbol:d.symbol,table:d.tableCsv||b.table||'std',rating:d.rating||b.rating||'',symH:d.symH,nameH:d.nameH,icon:d.icon&&iconById(d.icon)?d.icon:'',iconPos:d.iconPos||'left'}; }); for(const el of (it.custom||[])){ const b=DB.find(x=>norm(x.code)===norm(el.code)); el.prefix=b?b.prefix:'Q'; if(!el.rating&&b) el.rating=b.rating||''; if(!el.name&&b) el.name=b.name; if(el.icon&&!iconById(el.icon)) el.icon=''; if(!b){ DB.push({code:el.code,name:el.name,mod:0,prefix:'Q',table:'std',rating:'',kind:'custom',shape:el.shape,cw:el.w,ch:el.h,holes:el.holes}); added.push(el.code); SETTINGS.libUpdated=Date.now(); } } } P.cabinets.push(cab); }
   if(!P.cabinets.length) P.cabinets.push(newCab()); saveLibrary();
   selCab=parsed.cabinets[0]||P.cabinets[0]; selItem=null; selGrp=null; selDev=null; ZOOM.key=''; syncInputs(); change(); renderPalette();
   const w=[...parsed.warn]; if(added.length) w.push('Dodano do bazy nieznane kody: '+[...new Set(added)].join(', ')+' (uzupełnij w Bibliotece)');
   const m=$('csvMsg'); m.style.display='block'; m.className='msg'+(parsed.warn.length?' err':' ok'); m.textContent=`Wczytano ${parsed.cabinets.length} szaf, ${parsed.cabinets.reduce((a,c)=>a+c.items.length,0)} elementów.`+(w.length?' '+w.join(' · '):''); }
 function tableOut(t){ if(!t||t==='std') return ''; return t[1]+(t[0]==='c'?'obok':''); }
-function exportCsv(only){ const q=v=>String(v==null?'':v).replace(/;/g,','); const L=P.label; if(only){ const r=only.row; const pos=r.pos==='niche'?'srodek': r.pos==='top'?(r.nicheY==null?'blok':r.nicheY):'blok'; let o=[`# ${APP_NAME} – opisy rzędu`,`MASKOWNICA; ${only.w}; ${only.h}; ${r.mod}; ${r.nicheH}; ${pos}`]; const gx=groupX(r); for(const g of r.groups){ o.push(`GRUPA; ${q(g.name)}; ${g.align==='left'?'lewa':g.align==='right'?'prawa':gx.get(g.id)}; ${q(g.bot)}`); for(const d of g.devices) o.push(`APARAT; ${q(d.code)}; ${d.auto===false?q(d.symbol):''}; ${q(d.name)}; ; ${tableOut(d.table)}; ${d.mod}; ${d.symH||''}; ${d.nameH||''}; ${q(d.rating)}; ${q(d.icon||'')}; ${d.icon?(d.iconPos||'left'):''}`); } return o.join('\n')+'\n'; }
+function exportCsv(only){ const q=v=>String(v==null?'':v).replace(/;/g,','); const L=P.label; if(only){ const r=only.row; const pos=r.pos==='niche'?'srodek': r.pos==='top'?(r.nicheY==null?'blok':r.nicheY):'blok'; let o=[`# ${APP_NAME} – opisy rzędu`,`MASKOWNICA; ${only.w}; ${only.h}; ${r.mod}; ${r.nicheH}; ${pos}`]; const gx=groupX(r); for(const g of r.groups){ o.push(`GRUPA; ${q(g.name)}; ${g.align==='left'?'lewa':g.align==='right'?'prawa':gx.get(g.id)}; ${q(g.bot)}`); for(const d of g.devices) o.push(`APARAT; ${q(d.code)}; ${d.auto===false?q(d.symbol):''}; ${q(d.name)}; ; ${tableOut(d.table)}; ${d.mod}; ${d.symH||''}; ${d.nameH||''}; ${q(d.rating)}; ${q(d.icon||'')}; ${d.icon?(d.iconPos||'left'):''}`); } { const r=only; for(const el of (r.custom||[])) o.push(`ELEMENT; ${q(el.code)}; ${el.auto===false?q(el.symbol):''}; ${q(el.name)}; ${q(el.rating)}; ${el.shape==='circle'?'okrag':'prostokat'}; ${el.w}; ${el.h}; ${el.x==null?'':el.x}; ${el.y==null?'':el.y}; ${({above:'nad',below:'pod',left:'lewa',right:'prawa',none:'brak'})[el.labelPos||'above']}; ${el.labelW||''}; ${el.holes?el.holes.n||0:0}; ${el.holes?el.holes.dx||0:0}; ${el.holes?el.holes.dy||0:0}; ${el.holes?el.holes.d||5:5}; ${q(el.icon||'')}; ${el.icon?(el.iconPos||'left'):''}`); } return o.join('\n')+'\n'; }
   let o=[`# ${APP_NAME} ${APP_VER} – eksport ${new Date().toLocaleString('pl-PL')} (format CSV v3)`,`PROJEKT; ${q(P.name)}; ${q(P.tag)}; ${q(P.revision)}`,`ZLECENIE; ${q(ORDER.number)}; ${q(ORDER.client)}; ${q(ORDER.object)}; ${q(ORDER.address)}`,`MODUL; ${P.pitch}`,`ODSTEP; ${P.cabGap||0}`,`RAMKA; ${L.h}; ${L.gap}; ${L.symH}; ${L.nameH}; ${L.lwMain}; ${L.frameR}; ${L.split}; ${L.lwDivV}; ${L.lwDivH}`];
   for(const d of DB) o.push(`BAZA; ${q(d.code)}; ${q(d.name)}; ${d.mod}; ${q(d.prefix)}; ${tableOut(d.table)||'std'}; ${q(d.rating)}${d.blank?'; zaslepka':''}`);
   for(const c of P.cabinets){ o.push(`SZAFA; ${c.w}; ${c.h}; ${c.plinth||0}; ${c.hinge==='right'?'prawa':'lewa'}; ${c.leaves===2?2:1}`); for(const it of c.items){
     if(it.type==='empty') o.push(`PUSTE; ${it.h}; ${it.w}`); else if(it.type==='plate') o.push(`PLYTA; ${it.w}; ${it.h}`); else if(it.type==='blank') o.push(`ZASLEPKA; ${it.w}; ${it.h}`);
     else { const r=it.row; const pos=r.pos==='niche'?'srodek': r.pos==='top'?(r.nicheY==null?'blok':r.nicheY):'blok'; o.push(`MASKOWNICA; ${it.w}; ${it.h}; ${r.mod}; ${r.nicheH}; ${pos}`); const gx=groupX(r);
       for(const g of r.groups){ o.push(`GRUPA; ${q(g.name)}; ${g.align==='left'?'lewa':g.align==='right'?'prawa':gx.get(g.id)}; ${q(g.bot)}`);
-        for(const d of g.devices) o.push(`APARAT; ${q(d.code)}; ${d.auto===false?q(d.symbol):''}; ${q(d.name)}; ; ${tableOut(d.table)}; ${d.mod}; ${d.symH||''}; ${d.nameH||''}; ${q(d.rating)}; ${q(d.icon||'')}; ${d.icon?(d.iconPos||'left'):''}`); } } } }
+        for(const d of g.devices) o.push(`APARAT; ${q(d.code)}; ${d.auto===false?q(d.symbol):''}; ${q(d.name)}; ; ${tableOut(d.table)}; ${d.mod}; ${d.symH||''}; ${d.nameH||''}; ${q(d.rating)}; ${q(d.icon||'')}; ${d.icon?(d.iconPos||'left'):''}`); } { const r=it; for(const el of (r.custom||[])) o.push(`ELEMENT; ${q(el.code)}; ${el.auto===false?q(el.symbol):''}; ${q(el.name)}; ${q(el.rating)}; ${el.shape==='circle'?'okrag':'prostokat'}; ${el.w}; ${el.h}; ${el.x==null?'':el.x}; ${el.y==null?'':el.y}; ${({above:'nad',below:'pod',left:'lewa',right:'prawa',none:'brak'})[el.labelPos||'above']}; ${el.labelW||''}; ${el.holes?el.holes.n||0:0}; ${el.holes?el.holes.dx||0:0}; ${el.holes?el.holes.dy||0:0}; ${el.holes?el.holes.d||5:5}; ${q(el.icon||'')}; ${el.icon?(el.iconPos||'left'):''}`); } } } }
   return o.join('\n')+'\n'; }
 let csvMode='new';
 $('btnCsvNew').onclick=()=>{ csvMode='new'; $('csvFile').click(); }; $('btnCsvAdd').onclick=()=>{ csvMode='add'; $('csvFile').click(); };
