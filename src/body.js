@@ -902,6 +902,7 @@ $('btnCsvSpec').onclick=()=>saveFile('eitlab-format-csv.txt', CSV_SPEC);
   $('font').innerHTML=fontSelectOptions(); $('fontSym').innerHTML=fontSelectOptions(); $('fontInfo').innerHTML=fontSelectOptions();
   const st=await IDB.get('settings'); if(st) SETTINGS=Object.assign(SETTINGS,st); document.documentElement.dataset.theme=SETTINGS.theme||'light';
   const dbs=await IDB.get('devices'); if(dbs&&dbs.length) DB=dbs; for(const d of DB){ if(!d.table) d.table='std'; if(d.rating==null) d.rating=''; }
+  { let addedDef=0; for(const d of DEFAULT_DB){ if(!DB.find(x=>norm(x.code)===norm(d.code))){ DB.push(JSON.parse(JSON.stringify(d))); addedDef++; } } if(addedDef){ await IDB.set('devices',DB); SETTINGS.libUpdated=Date.now(); } }
   const enc=await IDB.get('enclosures'); if(enc&&enc.length) ENC=enc;
   let order=null, board=null;
   if(SETTINGS.current){ order=await IDB.get('order:'+SETTINGS.current.orderId); board=await IDB.get('board:'+SETTINGS.current.boardId); }
